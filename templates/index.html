@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Home - DataQE Suite{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 text-center">
+            <h1 class="display-4 mb-4">Welcome to DataQE Suite</h1>
+            <p class="lead">
+                A centralized platform for managing and comparing SQL query pairs across teams and projects.
+            </p>
+            <div class="mt-5">
+                <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg px-5">Get Started</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-5">
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <h3 class="card-title">Organize</h3>
+                    <p class="card-text">Manage query pairs across multiple teams and projects in one place.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <h3 class="card-title">Collaborate</h3>
+                    <p class="card-text">Work together with your team to maintain and test query pairs.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <h3 class="card-title">Validate</h3>
+                    <p class="card-text">Seamlessly integrate with your existing data comparison framework.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

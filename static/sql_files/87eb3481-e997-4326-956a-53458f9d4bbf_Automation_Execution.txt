@@ -1,0 +1,6 @@
+python -m pytest --alluredir=allure_report .\tests\BH_DBTablesValidation.py --db_filepath C:\Users\sunil\Source\BH_EATA\EATA-DB\ --db_mismatch_filepath C:\Users\sunil\Source\BH_EATA\EATA-DB\
+
+python -m pytest --alluredir=allure_report .\tests\BH_DBTablesValidation.py --db_filepath Users/sunil/Source/DQE/DBV/ --db_mismatch_filepath Users/sunil/Source/DQE/DBV/
+
+
+

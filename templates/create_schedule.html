@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block title %}Create Schedule - DataQE Suite{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('testcase_detail', testcase_id=test_case.id) }}">Test Case</a></li>
+                    <li class="breadcrumb-item active">Create Schedule</li>
+                </ol>
+            </nav>
+            
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Schedule Test Case Execution</h4>
+                    <p class="text-muted mb-0">Test Case: {{ test_case.tcid }} - {{ test_case.tc_name }}</p>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        <div class="mb-3">
+                            <label for="schedule_type" class="form-label">Schedule Type</label>
+                            <select class="form-select" id="schedule_type" name="schedule_type" required onchange="updateScheduleFields()">
+                                <option value="">Select schedule type...</option>
+                                <option value="DAILY">Daily</option>
+                                <option value="WEEKLY">Weekly</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="schedule_time" class="form-label">Execution Time</label>
+                            <input type="time" class="form-control" id="schedule_time" name="schedule_time" required>
+                            <div class="form-text">Time is in server timezone</div>
+                        </div>
+                        
+                        <div class="mb-3" id="weekly_days" style="display: none;">
+                            <label class="form-label">Days of Week</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="0" id="day_mon" name="schedule_days">
+                                <label class="form-check-label" for="day_mon">Monday</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="1" id="day_tue" name="schedule_days">
+                                <label class="form-check-label" for="day_tue">Tuesday</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="2" id="day_wed" name="schedule_days">
+                                <label class="form-check-label" for="day_wed">Wednesday</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="3" id="day_thu" name="schedule_days">
+                                <label class="form-check-label" for="day_thu">Thursday</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="4" id="day_fri" name="schedule_days">
+                                <label class="form-check-label" for="day_fri">Friday</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="5" id="day_sat" name="schedule_days">
+                                <label class="form-check-label" for="day_sat">Saturday</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="6" id="day_sun" name="schedule_days">
+                                <label class="form-check-label" for="day_sun">Sunday</label>
+                            </div>
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <h6 class="alert-heading">Note:</h6>
+                            <p class="mb-0">The scheduled test will only run if the test case is active (Test YN = 'Y').</p>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('testcase_detail', testcase_id=test_case.id) }}" class="btn btn-outline-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary">Create Schedule</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function updateScheduleFields() {
+    const scheduleType = document.getElementById('schedule_type').value;
+    const weeklyDays = document.getElementById('weekly_days');
+    
+    if (scheduleType === 'WEEKLY') {
+        weeklyDays.style.display = 'block';
+    } else {
+        weeklyDays.style.display = 'none';
+    }
+}
+
+// Form validation
+document.querySelector('form').addEventListener('submit', function(e) {
+    const scheduleType = document.getElementById('schedule_type').value;
+    
+    if (scheduleType === 'WEEKLY') {
+        const checkboxes = document.querySelectorAll('input[name="schedule_days"]:checked');
+        if (checkboxes.length === 0) {
+            e.preventDefault();
+            alert('Please select at least one day for weekly schedule');
+        }
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,360 @@
+{% extends "base.html" %}
+
+{% block title %}Test Case Details - DataQE Suite{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                    {% if current_user.is_admin and test_case.team %}
+                    <li class="breadcrumb-item"><a href="{{ url_for('projects') }}">Projects</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('project_detail', project_id=test_case.team.project.id) }}">{{ test_case.team.project.name }}</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('team_detail', team_id=test_case.team.id) }}">{{ test_case.team.name }}</a></li>
+                    {% endif %}
+                    <li class="breadcrumb-item active">Test Case Details</li>
+                </ol>
+            </nav>
+            
+            <div class="d-flex justify-content-between align-items-start mb-4">
+                <div>
+                    <h2>{{ test_case.tcid }}</h2>
+                    <p class="text-muted">{{ test_case.table_name }} - {{ test_case.test_type }}</p>
+                </div>
+                <div>
+                    <button type="button" 
+                            class="btn btn-success me-2"
+                            onclick="executeTest(event, '{{ test_case.id }}')">
+                        <i class="bi bi-play-circle"></i> Execute
+                    </button>
+                    <a href="{{ url_for('create_schedule', test_case_id=test_case.id) }}"
+                       class="btn btn-outline-primary me-2">
+                        <i class="bi bi-clock"></i> Schedule
+                    </a>
+                    <a href="{{ url_for('edit_testcase', testcase_id=test_case.id) }}" class="btn btn-outline-primary me-2">Edit</a>
+                    {% if current_user.is_admin and test_case.team %}
+                    <a href="{{ url_for('team_detail', team_id=test_case.team_id) }}" class="btn btn-outline-secondary">Back to Team</a>
+                    {% else %}
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">Back to Dashboard</a>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-4 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header">Test Case Info</div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <h6>Test Case Name</h6>
+                                <p>{{ test_case.tc_name }}</p>
+                            </div>
+                            <div class="mb-3">
+                                <h6>Status</h6>
+                                {% if test_case.test_yn == 'Y' %}
+                                <span class="badge bg-success">Active</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Inactive</span>
+                                {% endif %}
+                            </div>
+                            <div class="mb-3">
+                                <h6>Created By</h6>
+                                <p>{{ test_case.creator.username if test_case.creator else 'Unknown' }}</p>
+                            </div>
+                            <div class="mb-3">
+                                <h6>Created At</h6>
+                                <p>{{ test_case.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                            </div>
+                            <div class="mb-3">
+                                <h6>Last Updated</h6>
+                                <p>{{ test_case.updated_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-8 mb-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <ul class="nav nav-tabs card-header-tabs" id="configTabs" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" id="connection-tab" data-bs-toggle="tab" data-bs-target="#connection-tab-pane" type="button" role="tab">Connections</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="parameters-tab" data-bs-toggle="tab" data-bs-target="#parameters-tab-pane" type="button" role="tab">Parameters</button>
+                                </li>
+                            </ul>
+                        </div>
+                        <div class="card-body">
+                            <div class="tab-content" id="configTabsContent">
+                                <div class="tab-pane fade show active" id="connection-tab-pane" role="tabpanel" tabindex="0">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <h5>Source Connection</h5>
+                                            {% if test_case.test_type == 'CCD_Validation' %}
+                                                {% if test_case.src_connection %}
+                                                <div class="card">
+                                                    <div class="card-body">
+                                                        <h6 class="card-title">{{ test_case.src_connection.name }}</h6>
+                                                        <p class="card-text mb-1"><strong>Server:</strong> {{ test_case.src_connection.server }}</p>
+                                                        <p class="card-text mb-1"><strong>Database:</strong> {{ test_case.src_connection.database }}</p>
+                                                        {% if test_case.src_connection.warehouse %}
+                                                        <p class="card-text mb-1"><strong>Warehouse:</strong> {{ test_case.src_connection.warehouse }}</p>
+                                                        {% endif %}
+                                                        {% if test_case.src_connection.role %}
+                                                        <p class="card-text"><strong>Role:</strong> {{ test_case.src_connection.role }}</p>
+                                                        {% endif %}
+                                                    </div>
+                                                </div>
+                                                {% else %}
+                                                <p class="text-muted">No source connection specified</p>
+                                                {% endif %}
+                                            {% else %}
+                                                <div class="alert alert-info">
+                                                    <i class="bi bi-info-circle"></i> Source connection not required for {{ test_case.test_type }}
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                        
+                                        <div class="col-md-6">
+                                            <h5>Target Connection</h5>
+                                            {% if test_case.tgt_connection %}
+                                            <div class="card">
+                                                <div class="card-body">
+                                                    <h6 class="card-title">{{ test_case.tgt_connection.name }}</h6>
+                                                    <p class="card-text mb-1"><strong>Server:</strong> {{ test_case.tgt_connection.server }}</p>
+                                                    <p class="card-text mb-1"><strong>Database:</strong> {{ test_case.tgt_connection.database }}</p>
+                                                    {% if test_case.tgt_connection.warehouse %}
+                                                    <p class="card-text mb-1"><strong>Warehouse:</strong> {{ test_case.tgt_connection.warehouse }}</p>
+                                                    {% endif %}
+                                                    {% if test_case.tgt_connection.role %}
+                                                    <p class="card-text"><strong>Role:</strong> {{ test_case.tgt_connection.role }}</p>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                            {% else %}
+                                            <p class="text-muted">No target connection specified</p>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="tab-pane fade" id="parameters-tab-pane" role="tabpanel" tabindex="0">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <h6>Primary Key Columns</h6>
+                                            <p>{{ test_case.pk_columns|replace('["', '')|replace('"]', '')|replace('"', '') if test_case.pk_columns else 'None' }}</p>
+                                            
+                                            <h6>Date Fields</h6>
+                                            <p>{{ test_case.date_fields|replace('["', '')|replace('"]', '')|replace('"', '') if test_case.date_fields else 'None' }}</p>
+                                            
+                                            <h6>Percentage Fields</h6>
+                                            <p>{{ test_case.percentage_fields|replace('["', '')|replace('"]', '')|replace('"', '') if test_case.percentage_fields else 'None' }}</p>
+                                        </div>
+                                        
+                                        <div class="col-md-6">
+                                            <h6>Threshold Percentage</h6>
+                                            <p>{{ test_case.threshold_percentage }}%</p>
+                                            
+                                            <h6>Delimiter</h6>
+                                            <p>{{ test_case.delimiter }}</p>
+                                            
+                                            <h6>Filters</h6>
+                                            <p>{{ test_case.filters or 'None' }}</p>
+                                            
+                                            {% if test_case.src_connection and test_case.src_connection.is_excel %}
+                                            <h6>Source Sheet Name</h6>
+                                            <p>{{ test_case.src_sheet_name or 'Default' }}</p>
+                                            {% endif %}
+                                            
+                                            {% if test_case.tgt_connection and test_case.tgt_connection.is_excel %}
+                                            <h6>Target Sheet Name</h6>
+                                            <p>{{ test_case.tgt_sheet_name or 'Default' }}</p>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-12">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <ul class="nav nav-tabs card-header-tabs" id="sqlTabs" role="tablist">
+                                {% if test_case.test_type == 'CCD_Validation' %}
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" id="source-sql-tab" data-bs-toggle="tab" data-bs-target="#source-sql-tab-pane" type="button" role="tab">Source SQL</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="target-sql-tab" data-bs-toggle="tab" data-bs-target="#target-sql-tab-pane" type="button" role="tab">Target SQL</button>
+                                </li>
+                                {% else %}
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" id="target-sql-tab" data-bs-toggle="tab" data-bs-target="#target-sql-tab-pane" type="button" role="tab">Target SQL</button>
+                                </li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                        <div class="card-body">
+                            <div class="tab-content" id="sqlTabsContent">
+                                {% if test_case.test_type == 'CCD_Validation' %}
+                                <div class="tab-pane fade show active" id="source-sql-tab-pane" role="tabpanel" tabindex="0">
+                                    {% if src_sql %}
+                                        <div class="card-body">
+                                            {% if "Excel file:" in src_sql %}
+                                            <div class="alert alert-info">
+                                                {{ src_sql|replace('\n', '<br>')|safe }}
+                                            </div>
+                                            {% else %}
+                                            <pre class="code-block"><code>{{ src_sql }}</code></pre>
+                                            {% endif %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div class="tab-pane fade" id="target-sql-tab-pane" role="tabpanel" tabindex="0">
+                                    {% if tgt_sql %}
+                                        <div class="card-body">
+                                            {% if "Excel file:" in tgt_sql %}
+                                            <div class="alert alert-info">
+                                                {{ tgt_sql|replace('\n', '<br>')|safe }}
+                                            </div>
+                                            {% else %}
+                                            <pre class="code-block"><code>{{ tgt_sql }}</code></pre>
+                                            {% endif %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                {% else %}
+                                <div class="tab-pane fade show active" id="target-sql-tab-pane" role="tabpanel" tabindex="0">
+                                    {% if tgt_sql %}
+                                    <pre><code>{{ tgt_sql }}</code></pre>
+                                    {% else %}
+                                    <p class="text-muted">No target SQL available</p>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Recent Executions Section -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Recent Executions</h5>
+                            <a href="{{ url_for('execution_history') }}?test_case_id={{ test_case.id }}" 
+                               class="btn btn-sm btn-outline-primary">View All</a>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Execution Time</th>
+                                            <th>Status</th>
+                                            <th>Duration</th>
+                                            <th>Records</th>
+                                            <th>Mismatches</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for execution in test_case.executions[:5] %}
+                                        <tr>
+                                            <td>{{ execution.execution_time.strftime('%Y-%m-%d %H:%M') }}</td>
+                                            <td>
+                                                {% if execution.status == 'PASSED' %}
+                                                    <span class="badge bg-success">PASSED</span>
+                                                {% elif execution.status == 'FAILED' %}
+                                                    <span class="badge bg-danger">FAILED</span>
+                                                {% elif execution.status == 'ERROR' %}
+                                                    <span class="badge bg-warning">ERROR</span>
+                                                {% elif execution.status == 'RUNNING' %}
+                                                    <span class="badge bg-info">RUNNING</span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary">{{ execution.status }}</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if execution.duration %}
+                                                    {{ "%.2f"|format(execution.duration) }}s
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ execution.records_compared or '-' }}</td>
+                                            <td>
+                                                {% if execution.mismatches_found %}
+                                                    <span class="text-danger">{{ execution.mismatches_found }}</span>
+                                                {% else %}
+                                                    0
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <a href="{{ url_for('execution_detail', execution_id=execution.id) }}" 
+                                                   class="btn btn-sm btn-outline-primary">Details</a>
+                                            </td>
+                                        </tr>
+                                        {% else %}
+                                        <tr>
+                                            <td colspan="6" class="text-center">No executions yet</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript for AJAX execution -->
+<script>
+function executeTest(event, testCaseId) {
+    event.preventDefault();
+    
+    if (!confirm('Execute this test case?')) {
+        return;
+    }
+    
+    const button = event.currentTarget;
+    const originalText = button.innerHTML;
+    button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Executing...';
+    button.disabled = true;
+    
+    fetch(`/api/execute/${testCaseId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert('Error: ' + data.error);
+        } else {
+            alert('Test execution started! Execution ID: ' + data.execution_id);
+            location.reload();
+        }
+    })
+    .catch(error => {
+        alert('Error executing test: ' + error);
+    })
+    .finally(() => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+    });
+}
+</script>
+{% endblock %}

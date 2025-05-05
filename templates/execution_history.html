@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block title %}Execution History - DataQE Suite{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('results_dashboard') }}">Results Dashboard</a></li>
+                    <li class="breadcrumb-item active">Execution History</li>
+                </ol>
+            </nav>
+            
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>Execution History</h2>
+                <div>
+                    <button class="btn btn-outline-secondary me-2" onclick="exportToCSV()">Export CSV</button>
+                    <a href="{{ url_for('results_dashboard') }}" class="btn btn-primary">Dashboard</a>
+                </div>
+            </div>
+            
+            <!-- Filter Section -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <form method="get" class="row g-3">
+                        <div class="col-md-3">
+                            <label for="status" class="form-label">Status</label>
+                            <select class="form-select" id="status" name="status">
+                                <option value="">All Statuses</option>
+                                <option value="PASSED" {% if request.args.get('status') == 'PASSED' %}selected{% endif %}>Passed</option>
+                                <option value="FAILED" {% if request.args.get('status') == 'FAILED' %}selected{% endif %}>Failed</option>
+                                <option value="ERROR" {% if request.args.get('status') == 'ERROR' %}selected{% endif %}>Error</option>
+                                <option value="RUNNING" {% if request.args.get('status') == 'RUNNING' %}selected{% endif %}>Running</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="date_from" class="form-label">From Date</label>
+                            <input type="date" class="form-control" id="date_from" name="date_from" value="{{ request.args.get('date_from', '') }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="date_to" class="form-label">To Date</label>
+                            <input type="date" class="form-control" id="date_to" name="date_to" value="{{ request.args.get('date_to', '') }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">&nbsp;</label>
+                            <button type="submit" class="btn btn-primary d-block">Apply Filters</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Execution History Table -->
+            <div class="card">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Test Case ID</th>
+                                    <th>Test Name</th>
+                                    <th>Team</th>
+                                    <th>Execution Time</th>
+                                    <th>Duration</th>
+                                    <th>Status</th>
+                                    <th>Records</th>
+                                    <th>Mismatches</th>
+                                    <th>Executed By</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for execution in executions.items %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ url_for('testcase_detail', testcase_id=execution.test_case.id) }}">
+                                            {{ execution.test_case.tcid }}
+                                        </a>
+                                    </td>
+                                    <td>{{ execution.test_case.tc_name }}</td>
+                                    <td>{{ execution.test_case.team.name }}</td>
+                                    <td>{{ execution.execution_time.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                    <td>
+                                        {% if execution.duration %}
+                                            {{ "%.2f"|format(execution.duration) }}s
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if execution.status == 'PASSED' %}
+                                            <span class="badge bg-success">PASSED</span>
+                                        {% elif execution.status == 'FAILED' %}
+                                            <span class="badge bg-danger">FAILED</span>
+                                        {% elif execution.status == 'ERROR' %}
+                                            <span class="badge bg-warning">ERROR</span>
+                                        {% elif execution.status == 'RUNNING' %}
+                                            <span class="badge bg-info">RUNNING</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ execution.status }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ execution.records_compared or '-' }}</td>
+                                    <td>
+                                        {% if execution.mismatches_found %}
+                                            <span class="text-danger">{{ execution.mismatches_found }}</span>
+                                        {% else %}
+                                            0
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ execution.executor.username if execution.executor else 'System' }}</td>
+                                    <td>
+                                        <a href="{{ url_for('execution_detail', execution_id=execution.id) }}" 
+                                           class="btn btn-sm btn-outline-primary">
+                                            Details
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="10" class="text-center">No execution history found</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Pagination -->
+                {% if executions.pages > 1 %}
+                <div class="card-footer">
+                    <nav aria-label="Execution history pagination">
+                        <ul class="pagination mb-0">
+                            {% if executions.has_prev %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('execution_history', page=executions.prev_num) }}">Previous</a>
+                            </li>
+                            {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">Previous</span>
+                            </li>
+                            {% endif %}
+                            
+                            {% for page_num in executions.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                                {% if page_num %}
+                                    {% if page_num != executions.page %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="{{ url_for('execution_history', page=page_num) }}">{{ page_num }}</a>
+                                    </li>
+                                    {% else %}
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ page_num }}</span>
+                                    </li>
+                                    {% endif %}
+                                {% else %}
+                                    <li class="page-item disabled">
+                                        <span class="page-link">...</span>
+                                    </li>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if executions.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('execution_history', page=executions.next_num) }}">Next</a>
+                            </li>
+                            {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">Next</span>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function exportToCSV() {
+    // Add export functionality here
+    alert('Export functionality will be implemented soon');
+}
+</script>
+{% endblock %}

@@ -1,0 +1,306 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - DataQE Suite{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-3 col-lg-2 px-0 sidebar">
+            <div class="d-flex flex-column p-3">
+                <h5 class="sidebar-heading mb-3">
+                    {% if team %}
+                        {{ team.name }}
+                        <small class="d-block text-muted">{{ team.project.name }}</small>
+                    {% else %}
+                        Dashboard
+                    {% endif %}
+                </h5>
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="{{ url_for('dashboard') }}">
+                            <i class="bi bi-speedometer2"></i> Dashboard
+                        </a>
+                    </li>
+                    {% if team %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('team_detail', team_id=team.id) }}">
+                            <i class="bi bi-people"></i> Team Details
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('new_connection', project_id=team.project.id) }}">
+                            <i class="bi bi-database-add"></i> New Connection
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('new_testcase') }}">
+                            <i class="bi bi-plus-circle"></i> New Test Case
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+        
+        <div class="col-md-9 col-lg-10 px-md-4 py-4">
+            {% if team %}
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h2>Team Dashboard</h2>
+                        <p class="text-muted">Project: {{ team.project.name }}</p>
+                    </div>
+                    <div>
+                        <a href="{{ url_for('new_connection', project_id=team.project.id) }}" class="btn btn-primary me-2">
+                            <i class="bi bi-database-add"></i> New Connection
+                        </a>
+                        <a href="{{ url_for('new_testcase') }}" class="btn btn-primary">
+                            <i class="bi bi-plus-circle"></i> New Test Case
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- Team Statistics -->
+                <div class="row mb-4">
+                    <div class="col-md-3 mb-3">
+                        <div class="card connection-card">
+                            <div class="card-body">
+                                <h5 class="card-title">Total Test Cases</h5>
+                                <p class="card-text display-4">{{ test_cases|length }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card connection-card">
+                            <div class="card-body">
+                                <h5 class="card-title">Active Test Cases</h5>
+                                <p class="card-text display-4">
+                                    {{ active_test_cases }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card connection-card">
+                            <div class="card-body">
+                                <h5 class="card-title">Team Members</h5>
+                                <p class="card-text display-4">{{ team.users|length }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card connection-card">
+                            <div class="card-body">
+                                <h5 class="card-title">Project Connections</h5>
+                                <p class="card-text display-4">{{ team.project.connections|length }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Execution Statistics -->
+                <div class="row mb-4">
+                    <div class="col-md-3 mb-3">
+                        <div class="card connection-card">
+                            <div class="card-body">
+                                <h5 class="card-title">Recent Executions</h5>
+                                <p class="card-text display-4">{{ recent_executions|length }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card connection-card">
+                            <div class="card-body">
+                                <h5 class="card-title">Passed Tests</h5>
+                                <p class="card-text display-4 text-success">{{ passed_tests }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card connection-card">
+                            <div class="card-body">
+                                <h5 class="card-title">Failed Tests</h5>
+                                <p class="card-text display-4 text-danger">{{ failed_tests }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card connection-card">
+                            <div class="card-body">
+                                <h5 class="card-title">Error Tests</h5>
+                                <p class="card-text display-4 text-warning">{{ error_tests }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Recent Executions -->
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Recent Test Executions</h5>
+                        <a href="{{ url_for('execution_history') }}" class="btn btn-sm btn-outline-primary">View All</a>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Test Case</th>
+                                        <th>Execution Time</th>
+                                        <th>Status</th>
+                                        <th>Duration</th>
+                                        <th>Mismatches</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for execution in recent_executions[:10] %}
+                                    <tr>
+                                        <td>
+                                            <a href="{{ url_for('testcase_detail', testcase_id=execution.test_case.id) }}">
+                                                {{ execution.test_case.tcid }}
+                                            </a>
+                                        </td>
+                                        <td>{{ execution.execution_time.strftime('%Y-%m-%d %H:%M') }}</td>
+                                        <td>
+                                            {% if execution.status == 'PASSED' %}
+                                                <span class="badge bg-success">PASSED</span>
+                                            {% elif execution.status == 'FAILED' %}
+                                                <span class="badge bg-danger">FAILED</span>
+                                            {% elif execution.status == 'ERROR' %}
+                                                <span class="badge bg-warning">ERROR</span>
+                                            {% elif execution.status == 'RUNNING' %}
+                                                <span class="badge bg-info">RUNNING</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">{{ execution.status }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if execution.duration %}
+                                                {{ "%.2f"|format(execution.duration) }}s
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if execution.mismatches_found %}
+                                                <span class="text-danger">{{ execution.mismatches_found }}</span>
+                                            {% else %}
+                                                0
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <a href="{{ url_for('execution_detail', execution_id=execution.id) }}" 
+                                               class="btn btn-sm btn-outline-primary">Details</a>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="6" class="text-center">No recent executions</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Test Cases -->
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Test Cases</h5>
+                        <div>
+                            <div class="input-group">
+                                <input type="text" class="form-control" placeholder="Search test cases..." id="searchInput">
+                                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0" id="testCasesTable">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Table</th>
+                                        <th>Type</th>
+                                        <th>Status</th>
+                                        <th>Created</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for test_case in test_cases %}
+                                    <tr>
+                                        <td>{{ test_case.tcid }}</td>
+                                        <td>{{ test_case.table_name }}</td>
+                                        <td>{{ test_case.test_type }}</td>
+                                        <td>
+                                            {% if test_case.test_yn == 'Y' %}
+                                                <span class="badge bg-success">Active</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">Inactive</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ test_case.created_at.strftime('%Y-%m-%d') }}</td>
+                                        <td>
+                                            <a href="{{ url_for('testcase_detail', testcase_id=test_case.id) }}" class="btn btn-sm btn-outline-primary">View</a>
+                                            <a href="{{ url_for('edit_testcase', testcase_id=test_case.id) }}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="6" class="text-center">
+                                            No test cases created yet.
+                                            <a href="{{ url_for('new_testcase') }}">Create your first test case</a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+            {% else %}
+                <div class="alert alert-warning">
+                    <h4 class="alert-heading">Not Assigned to a Team</h4>
+                    <p>You're not currently assigned to a team. Please contact your administrator to be assigned to a team.</p>
+                    <hr>
+                    <p class="mb-0">Once assigned to a team, you'll be able to view and manage test cases for your project.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchInput = document.getElementById('searchInput');
+        const table = document.getElementById('testCasesTable');
+        
+        if (searchInput && table) {
+            const tableRows = table.querySelectorAll('tbody tr');
+            
+            searchInput.addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+                
+                tableRows.forEach(row => {
+                    if (row.cells.length <= 1) return; // Skip "no records" row
+                    
+                    const id = row.cells[0].textContent.toLowerCase();
+                    const table = row.cells[1].textContent.toLowerCase();
+                    const type = row.cells[2].textContent.toLowerCase();
+                    
+                    if (id.includes(searchTerm) || table.includes(searchTerm) || type.includes(searchTerm)) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            });
+        }
+    });
+</script>
+{% endblock %}

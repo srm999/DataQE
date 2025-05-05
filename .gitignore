@@ -1,0 +1,118 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+__pycache__
+*.pyc
+
+# Distribution / packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+pytest-report/
+allure-report/
+allure_report/
+allure-results/
+
+# Virtual environments
+venv/
+env/
+ENV/
+.env
+.venv
+env.bak/
+venv.bak/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+.ipynb_metadata/
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+.spyderproject
+.spyproject
+.ropeproject
+
+# Data files
+*.csv
+*.parquet
+*.xlsx
+*.xls
+*.db
+*.sqlite
+*.pkl
+*.pickle
+*.h5
+*.hdf5
+*.feather
+*.sql
+
+
+# But track these specific YAML files
+!sample-config.yml
+secret*
+*credentials*
+*credential*
+.snowflake-creds
+*auth*
+*password*
+*token*
+*.pem
+*.key
+keyring_pass.txt
+*.yml
+
+# Azure and Snowflake specific
+*.azureml/
+snowflake_connection.json
+*.snowsql
+*.snowsql.log
+snowsql_log
+snowsql_rt.*
+
+# Logs
+logs/
+*.log
+log/
+mismatch_data/
+input/
+
+# Dask
+dask-worker-space/
+
+# Delta Lake
+_delta_log/
+
+# Others
+.history
+.DS_Store

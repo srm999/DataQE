@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %}Team Details - DataQE Suite{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                    {% if current_user.is_admin %}
+                    <li class="breadcrumb-item"><a href="{{ url_for('projects') }}">Projects</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('project_detail', project_id=team.project.id) }}">{{ team.project.name }}</a></li>
+                    {% endif %}
+                    <li class="breadcrumb-item active">{{ team.name }}</li>
+                </ol>
+            </nav>
+            
+            <div class="d-flex justify-content-between align-items-start mb-4">
+                <div>
+                    <h2>{{ team.name }}</h2>
+                    <p class="text-muted">Project: {{ team.project.name }}</p>
+                </div>
+                <div>
+                    {% if current_user.is_admin %}
+                    <a href="{{ url_for('new_testcase') }}?team_id={{ team.id }}" class="btn btn-primary me-2">Add Test Case</a>
+                    <a href="{{ url_for('project_detail', project_id=team.project.id) }}" class="btn btn-outline-secondary">Back to Project</a>
+                    {% else %}
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">Back to Dashboard</a>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Team Members Section -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Team Members</h5>
+                    {% if current_user.is_admin %}
+                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addMemberModal">
+                        <i class="bi bi-person-plus"></i> Add Member
+                    </button>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Email</th>
+                                    <th>Role</th>
+                                    {% if current_user.is_admin %}
+                                    <th>Actions</th>
+                                    {% endif %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user in users %}
+                                <tr>
+                                    <td>{{ user.username }}</td>
+                                    <td>{{ user.email }}</td>
+                                    <td>
+                                        {% if user.is_admin %}
+                                        <span class="badge bg-primary">Admin</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">Member</span>
+                                        {% endif %}
+                                    </td>
+                                    {% if current_user.is_admin %}
+                                    <td>
+                                        <form action="{{ url_for('remove_team_member', team_id=team.id, user_id=user.id) }}" method="post" style="display: inline;">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Remove this user from the team?')">Remove</button>
+                                        </form>
+                                    </td>
+                                    {% endif %}
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="{% if current_user.is_admin %}4{% else %}3{% endif %}" class="text-center">No team members assigned yet.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Test Cases Section -->
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Test Cases</h5>
+                    <a href="{{ url_for('new_testcase') }}?team_id={{ team.id }}" class="btn btn-sm btn-primary">Add Test Case</a>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Table</th>
+                                    <th>Type</th>
+                                    <th>Status</th>
+                                    <th>SRC Connection</th>
+                                    <th>TGT Connection</th>
+                                    <th>Created By</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for test_case in test_cases %}
+                                <tr>
+                                    <td>{{ test_case.tcid }}</td>
+                                    <td>{{ test_case.table_name }}</td>
+                                    <td>{{ test_case.test_type }}</td>
+                                    <td>
+                                        {% if test_case.test_yn == 'Y' %}
+                                        <span class="badge bg-success">Active</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">Inactive</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if test_case.src_connection %}
+                                        {{ test_case.src_connection.name }}
+                                        {% else %}
+                                        N/A
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if test_case.tgt_connection %}
+                                        {{ test_case.tgt_connection.name }}
+                                        {% else %}
+                                        N/A
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ test_case.creator.username if test_case.creator else 'Unknown' }}</td>
+                                    <td>
+                                        <a href="{{ url_for('testcase_detail', testcase_id=test_case.id) }}" class="btn btn-sm btn-outline-primary">View</a>
+                                        <a href="{{ url_for('edit_testcase', testcase_id=test_case.id) }}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="8" class="text-center">
+                                        No test cases created yet.
+                                        <a href="{{ url_for('new_testcase') }}?team_id={{ team.id }}">Create your first test case</a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Member Modal -->
+{% if current_user.is_admin %}
+<div class="modal fade" id="addMemberModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Team Member</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('add_team_member', team_id=team.id) }}" method="post">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="user_id" class="form-label">Select User</label>
+                        <select class="form-select" id="user_id" name="user_id" required>
+                            <option value="">Choose a user...</option>
+                            {% for user in available_users %}
+                                <option value="{{ user.id }}">{{ user.username }} ({{ user.email }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Member</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

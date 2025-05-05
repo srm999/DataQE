@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - DataQE Suite{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-3 col-lg-2 px-0 sidebar">
+            <div class="d-flex flex-column p-3">
+                <h5 class="sidebar-heading mb-3">Admin Dashboard</h5>
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="{{ url_for('dashboard') }}">
+                            Overview
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('projects') }}">
+                            Projects
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('users') }}">
+                            Users
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="col-md-9 col-lg-10 px-md-4 py-4">
+            <h2 class="mb-4">Admin Overview</h2>
+            
+            <!-- Statistics Cards -->
+            <div class="row">
+                <div class="col-md-3 mb-4">
+                    <div class="card connection-card">
+                        <div class="card-body">
+                            <h5 class="card-title">Total Projects</h5>
+                            <p class="card-text display-4">{{ projects|length }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-4">
+                    <div class="card connection-card">
+                        <div class="card-body">
+                            <h5 class="card-title">Total Teams</h5>
+                            <p class="card-text display-4">{{ total_teams }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-4">
+                    <div class="card connection-card">
+                        <div class="card-body">
+                            <h5 class="card-title">Total Users</h5>
+                            <p class="card-text display-4">{{ users|length }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-4">
+                    <div class="card connection-card">
+                        <div class="card-body">
+                            <h5 class="card-title">Active Test Cases</h5>
+                            <p class="card-text display-4">{{ total_active_test_cases }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Quick Actions -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <a href="{{ url_for('new_project') }}" class="btn btn-primary me-2">
+                        <i class="bi bi-plus-circle"></i> New Project
+                    </a>
+                    <a href="{{ url_for('new_user') }}" class="btn btn-primary me-2">
+                        <i class="bi bi-person-plus"></i> New User
+                    </a>
+                    <a href="{{ url_for('projects') }}" class="btn btn-outline-primary me-2">
+                        <i class="bi bi-folder"></i> Manage Projects
+                    </a>
+                    <a href="{{ url_for('users') }}" class="btn btn-outline-primary">
+                        <i class="bi bi-people"></i> Manage Users
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Projects Overview -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Projects Overview</h5>
+                    <a href="{{ url_for('projects') }}" class="btn btn-sm btn-outline-primary">View All</a>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for project in projects %}
+                        <div class="col-md-6 col-lg-4 mb-4">
+                            <div class="card h-100 connection-card">
+                                <div class="card-body">
+                                    <h5 class="card-title">{{ project.name }}</h5>
+                                    <p class="card-text">{{ project.description[:100] }}{% if project.description|length > 100 %}...{% endif %}</p>
+                                    <ul class="list-group list-group-flush mb-3">
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            Teams
+                                            <span class="badge bg-primary rounded-pill">{{ project.teams|length }}</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            Connections
+                                            <span class="badge bg-primary rounded-pill">{{ project.connections|length }}</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            Test Cases
+                                            <span class="badge bg-primary rounded-pill">{{ project_stats[project.id] }}</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                                <div class="card-footer bg-transparent">
+                                    <a href="{{ url_for('project_detail', project_id=project.id) }}" class="btn btn-outline-primary">Manage</a>
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="col-12">
+                            <div class="alert alert-info">
+                                No projects found. Click the "New Project" button to create your first project.
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Recent Activity -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Recent Test Cases</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Table</th>
+                                    <th>Type</th>
+                                    <th>Team</th>
+                                    <th>Project</th>
+                                    <th>Created By</th>
+                                    <th>Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for test_case in recent_test_cases %}
+                                <tr>
+                                    <td>{{ test_case.tcid }}</td>
+                                    <td>{{ test_case.table_name }}</td>
+                                    <td>{{ test_case.test_type }}</td>
+                                    <td>{{ test_case.team.name }}</td>
+                                    <td>{{ test_case.team.project.name }}</td>
+                                    <td>{{ test_case.creator.username if test_case.creator else 'Unknown' }}</td>
+                                    <td>{{ test_case.created_at.strftime('%Y-%m-%d') }}</td>
+                                    <td>
+                                        <a href="{{ url_for('testcase_detail', testcase_id=test_case.id) }}" class="btn btn-sm btn-outline-primary">View</a>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="8" class="text-center">No test cases found</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Recent Executions -->
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Recent Executions</h5>
+                    <a href="{{ url_for('execution_history') }}" class="btn btn-sm btn-outline-primary">View All</a>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Test Case</th>
+                                    <th>Team</th>
+                                    <th>Execution Time</th>
+                                    <th>Status</th>
+                                    <th>Mismatches</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for execution in recent_executions[:5] %}
+                                <tr>
+                                    <td>{{ execution.test_case.tcid }}</td>
+                                    <td>{{ execution.test_case.team.name }}</td>
+                                    <td>{{ execution.execution_time.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    <td>
+                                        {% if execution.status == 'PASSED' %}
+                                            <span class="badge bg-success">PASSED</span>
+                                        {% elif execution.status == 'FAILED' %}
+                                            <span class="badge bg-danger">FAILED</span>
+                                        {% elif execution.status == 'ERROR' %}
+                                            <span class="badge bg-warning">ERROR</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ execution.status }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if execution.mismatches_found %}
+                                            <span class="text-danger">{{ execution.mismatches_found }}</span>
+                                        {% else %}
+                                            0
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{{ url_for('execution_detail', execution_id=execution.id) }}" 
+                                           class="btn btn-sm btn-outline-primary">Details</a>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="6" class="text-center">No executions yet</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

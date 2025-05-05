@@ -1,0 +1,353 @@
+{% extends "base.html" %}
+
+{% block title %}New Test Case - DataQE Suite{% endblock %}
+
+{% block content %}
+<script>
+    // This will be populated with Excel connection IDs from the server
+    const excelConnectionIds = [
+        // The array will be populated by server-side templating
+    ];
+</script>
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                    {% if current_user.is_admin %}
+                    <li class="breadcrumb-item"><a href="{{ url_for('projects') }}">Projects</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('project_detail', project_id=team.project.id) }}">{{ team.project.name }}</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('team_detail', team_id=team.id) }}">{{ team.name }}</a></li>
+                    {% endif %}
+                    <li class="breadcrumb-item active">New Test Case</li>
+                </ol>
+            </nav>
+            
+            <h2 class="mb-4">Create New Test Case</h2>
+            
+            <div class="card">
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data">
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="tcid" class="form-label">Test Case ID</label>
+                                    <input type="text" class="form-control" id="tcid" name="tcid" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="table_name" class="form-label">Table Name</label>
+                                    <input type="text" class="form-control" id="table_name" name="table_name" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="test_type" class="form-label">Test Type</label>
+                                    <select class="form-select" id="test_type" name="test_type" required>
+                                        <option value="CCD_Validation">CCD Validation</option>
+                                        <option value="Structure_Validation">Structure Validation</option>
+                                        <option value="Duplicates_Check">Duplicates Check</option>
+                                        <option value="Constraint_Check">Constraint Check</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="tc_name" class="form-label">Test Case Name</label>
+                                    <input type="text" class="form-control" id="tc_name" name="tc_name" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <div class="form-check form-switch mt-4">
+                                        <input class="form-check-input" type="checkbox" id="test_yn" name="test_yn">
+                                        <label class="form-check-label" for="test_yn">Active Test Case</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <ul class="nav nav-tabs" id="queryTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="source-tab" data-bs-toggle="tab" data-bs-target="#source-tab-pane" type="button" role="tab">Source</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="target-tab" data-bs-toggle="tab" data-bs-target="#target-tab-pane" type="button" role="tab">Target</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="config-tab" data-bs-toggle="tab" data-bs-target="#config-tab-pane" type="button" role="tab">Configuration</button>
+                            </li>
+                        </ul>
+                        
+                        <div class="tab-content p-3 border border-top-0 rounded-bottom mb-4" id="queryTabsContent">
+                            <!-- Source Tab -->
+                            <div class="tab-pane fade show active" id="source-tab-pane" role="tabpanel" tabindex="0">
+                                <div id="source-section">
+                                    <div class="alert alert-info" id="source-not-required" style="display: none;">
+                                        <i class="bi bi-info-circle"></i> Source connection is not required for this test type.
+                                    </div>
+                                    <div id="source-fields">
+                                        <div class="mb-3">
+                                            <label for="src_connection_id" class="form-label">Source Connection</label>
+                                            <select class="form-select" id="src_connection_id" name="src_connection_id">
+                                                <option value="">-- Select Connection --</option>
+                                                {% for connection in connections %}
+                                                <option value="{{ connection.id }}">{{ connection.name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">Source SQL</label>
+                                            <div class="form-check form-check-inline mb-2">
+                                                <input class="form-check-input" type="radio" name="src_input_type" id="src_input_file" value="file" checked>
+                                                <label class="form-check-label" for="src_input_file">Upload SQL File</label>
+                                            </div>
+                                            <div class="form-check form-check-inline">
+                                                <input class="form-check-input" type="radio" name="src_input_type" id="src_input_query" value="query">
+                                                <label class="form-check-label" for="src_input_query">Write SQL Query</label>
+                                            </div>
+                                            
+                                            <div id="src_file_input" class="mt-2">
+                                                <input type="file" class="form-control" id="src_file" name="src_file" accept=".sql,.txt">
+                                            </div>
+                                            
+                                            <div id="src_query_input" class="mt-2" style="display: none;">
+                                                <textarea class="form-control sql-editor" id="src_query" name="src_query" rows="8"></textarea>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Excel specific fields -->
+                                        <div id="src_excel_fields" class="border p-3 rounded" style="display: none;">
+                                            <h5>Excel Settings</h5>
+                                            <div class="mb-3">
+                                                <label for="src_sheet_name" class="form-label">Sheet Name</label>
+                                                <input type="text" class="form-control" id="src_sheet_name" name="src_sheet_name">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Target Tab -->
+                            <div class="tab-pane fade" id="target-tab-pane" role="tabpanel" tabindex="0">
+                                <div class="mb-3">
+                                    <label for="tgt_connection_id" class="form-label">Target Connection <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="tgt_connection_id" name="tgt_connection_id" required>
+                                        <option value="">-- Select Connection --</option>
+                                        {% for connection in connections %}
+                                        <option value="{{ connection.id }}">{{ connection.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Target SQL <span class="text-danger">*</span></label>
+                                    <div class="form-check form-check-inline mb-2">
+                                        <input class="form-check-input" type="radio" name="tgt_input_type" id="tgt_input_file" value="file" checked>
+                                        <label class="form-check-label" for="tgt_input_file">Upload SQL File</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="tgt_input_type" id="tgt_input_query" value="query">
+                                        <label class="form-check-label" for="tgt_input_query">Write SQL Query</label>
+                                    </div>
+                                    
+                                    <div id="tgt_file_input" class="mt-2">
+                                        <input type="file" class="form-control" id="tgt_file" name="tgt_file" accept=".sql,.txt">
+                                    </div>
+                                    
+                                    <div id="tgt_query_input" class="mt-2" style="display: none;">
+                                        <textarea class="form-control sql-editor" id="tgt_query" name="tgt_query" rows="8"></textarea>
+                                    </div>
+                                </div>
+                                
+                                <!-- Excel specific fields -->
+                                <div id="tgt_excel_fields" class="border p-3 rounded" style="display: none;">
+                                    <h5>Excel Settings</h5>
+                                    <div class="mb-3">
+                                        <label for="tgt_sheet_name" class="form-label">Sheet Name</label>
+                                        <input type="text" class="form-control" id="tgt_sheet_name" name="tgt_sheet_name">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Config Tab -->
+                            <div class="tab-pane fade" id="config-tab-pane" role="tabpanel" tabindex="0">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="pk_columns" class="form-label">Primary Key Columns <small class="text-muted">(comma separated)</small></label>
+                                            <input type="text" class="form-control" id="pk_columns" name="pk_columns">
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label for="date_fields" class="form-label">Date Fields <small class="text-muted">(comma separated)</small></label>
+                                            <input type="text" class="form-control" id="date_fields" name="date_fields">
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label for="percentage_fields" class="form-label">Percentage Fields <small class="text-muted">(comma separated)</small></label>
+                                            <input type="text" class="form-control" id="percentage_fields" name="percentage_fields">
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="threshold_percentage" class="form-label">Threshold Percentage</label>
+                                            <input type="number" class="form-control" id="threshold_percentage" name="threshold_percentage" value="0" min="0" max="100" step="0.01">
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label for="delimiter" class="form-label">Delimiter</label>
+                                            <input type="text" class="form-control" id="delimiter" name="delimiter" value=",">
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label for="filters" class="form-label">Filters</label>
+                                            <input type="text" class="form-control" id="filters" name="filters">
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="header_columns" class="form-label">Header Columns <small class="text-muted">(comma separated)</small></label>
+                                            <input type="text" class="form-control" id="header_columns" name="header_columns">
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="skip_rows" class="form-label">Skip Rows <small class="text-muted">(comma separated)</small></label>
+                                            <input type="text" class="form-control" id="skip_rows" name="skip_rows">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            {% if current_user.is_admin %}
+                            <a href="{{ url_for('team_detail', team_id=team.id) }}" class="btn btn-outline-secondary">Cancel</a>
+                            {% else %}
+                            <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">Cancel</a>
+                            {% endif %}
+                            <button type="submit" class="btn btn-primary">Create Test Case</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Handle source input type toggle
+        const srcInputTypeRadios = document.querySelectorAll('input[name="src_input_type"]');
+        const srcFileInput = document.getElementById('src_file_input');
+        const srcQueryInput = document.getElementById('src_query_input');
+        srcInputTypeRadios.forEach(radio => {
+            radio.addEventListener('change', function() {
+                if (this.value === 'file') {
+                    srcFileInput.style.display = 'block';
+                    srcQueryInput.style.display = 'none';
+                } else {
+                    srcFileInput.style.display = 'none';
+                    srcQueryInput.style.display = 'block';
+                }
+            });
+        });
+    
+        // Handle target input type toggle
+        const tgtInputTypeRadios = document.querySelectorAll('input[name="tgt_input_type"]');
+        const tgtFileInput = document.getElementById('tgt_file_input');
+        const tgtQueryInput = document.getElementById('tgt_query_input');
+        tgtInputTypeRadios.forEach(radio => {
+            radio.addEventListener('change', function() {
+                if (this.value === 'file') {
+                    tgtFileInput.style.display = 'block';
+                    tgtQueryInput.style.display = 'none';
+                } else {
+                    tgtFileInput.style.display = 'none';
+                    tgtQueryInput.style.display = 'block';
+                }
+            });
+        });
+    
+        // Handle test type change
+        const testTypeSelect = document.getElementById('test_type');
+        const sourceSection = document.getElementById('source-section');
+        const sourceFields = document.getElementById('source-fields');
+        const sourceNotRequired = document.getElementById('source-not-required');
+        const srcConnectionSelect = document.getElementById('src_connection_id');
+        
+        function updateSourceVisibility() {
+            const testType = testTypeSelect.value;
+            if (testType === 'CCD_Validation') {
+                sourceFields.style.display = 'block';
+                sourceNotRequired.style.display = 'none';
+                // Make source connection required for CCD_Validation
+                srcConnectionSelect.setAttribute('required', '');
+            } else {
+                sourceFields.style.display = 'none';
+                sourceNotRequired.style.display = 'block';
+                // Remove required attribute for other test types
+                srcConnectionSelect.removeAttribute('required');
+                // Clear source fields
+                srcConnectionSelect.value = '';
+                document.getElementById('src_query').value = '';
+                document.getElementById('src_file').value = '';
+            }
+        }
+        
+        testTypeSelect.addEventListener('change', updateSourceVisibility);
+        // Initial call to set correct state
+        updateSourceVisibility();
+    
+        // Get the necessary elements
+        const srcConnection = document.getElementById('src_connection_id');
+        const tgtConnection = document.getElementById('tgt_connection_id');
+        const srcExcelFields = document.getElementById('src_excel_fields');
+        const tgtExcelFields = document.getElementById('tgt_excel_fields');
+    
+        // Function to toggle visibility of Excel fields
+        function toggleExcelFields() {
+            // Get Excel connection IDs from a data attribute set in the template
+            const excelConnections = JSON.parse(document.getElementById('excel-connections-data').textContent);
+            
+            if (excelConnections.includes(parseInt(srcConnection.value))) {
+                srcExcelFields.style.display = 'block';
+            } else {
+                srcExcelFields.style.display = 'none';
+            }
+            
+            if (excelConnections.includes(parseInt(tgtConnection.value))) {
+                tgtExcelFields.style.display = 'block';
+            } else {
+                tgtExcelFields.style.display = 'none';
+            }
+        }
+    
+        // Add event listeners
+        srcConnection.addEventListener('change', toggleExcelFields);
+        tgtConnection.addEventListener('change', toggleExcelFields);
+    
+        // Initialize field visibility on page load
+        toggleExcelFields();
+    });
+    </script>
+    
+    <!-- Hidden data element to store Excel connection IDs -->
+    <script type="application/json" id="excel-connections-data">
+    [{% for conn in connections %}{% if conn.is_excel %}{{ conn.id }}{% if not loop.last %},{% endif %}{% endif %}{% endfor %}]
+    </script>
+{% endblock %}

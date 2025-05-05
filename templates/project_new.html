@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}New Project - DataQE Suite{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('projects') }}">Projects</a></li>
+                    <li class="breadcrumb-item active">New Project</li>
+                </ol>
+            </nav>
+            
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Create New Project</h4>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('new_project') }}" method="post">
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Project Name</label>
+                            <input type="text" class="form-control" id="name" name="name" required>
+                            <div class="form-text">Choose a unique name for your project</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Description</label>
+                            <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+                            <div class="form-text">Brief description of the project's purpose</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="folder_path" class="form-label">Project Folder Path</label>
+                            <input type="text" class="form-control" id="folder_path" name="folder_path" required>
+                            <div class="form-text">
+                                Specify the base folder path for this project. The system will create 'input' and 'output' subdirectories automatically.
+                                <br>
+                                Example: C:\Projects\DataValidation or /home/user/projects/data-validation
+                            </div>
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <h6 class="alert-heading">Folder Structure</h6>
+                            <p class="mb-0">The following structure will be created:</p>
+                            <ul class="mb-0 mt-2">
+                                <li><strong>&lt;project_folder&gt;/</strong>
+                                    <ul>
+                                        <li><strong>input/</strong> - Test cases and SQL queries will be stored here</li>
+                                        <li><strong>output/</strong> - Comparison results will be saved here</li>
+                                    </ul>
+                                </li>
+                            </ul>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{{ url_for('projects') }}" class="btn btn-outline-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary">Create Project</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

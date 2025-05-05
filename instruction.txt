@@ -1,0 +1,41 @@
+Install pip (https://pip.pypa.io/en/stable/installing/)
+Linux: python3 -m pip install --user --upgrade pip
+Windows: py -m pip install --user --upgrade pip
+Mac: pip install --upgrade pip
+
+Installing virtualenv
+Linux: python3 -m pip install --user virtualenv
+Windows: py -m pip install --user virtualenv
+
+Create the project folder, get inside 
+
+Create a virtual environment
+Linux: python3 -m venv venv
+windows: py -m venv venv
+
+Activating a virtual environment
+Linux: source env/bin/activate
+Windows: .\venv\Scripts\activate
+Mac: source venv/bin/activate
+
+Install requirements using
+pip install -r requirements.txt -v
+
+Configure python interpreter in Pycharm
+
+Make pytest the default runner
+
+Run all tests
+pytest tests/
+
+Run test in parallel
+pytest -n auto tests/
+
+Run tests with markers
+pytest tests/ -m create_user
+pytest tests/ -m "not create_user"
+
+
+Run test based on class/method name
+pytest tests/API_04.py::API_04::test_API_04
+
