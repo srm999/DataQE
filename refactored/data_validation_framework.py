@@ -334,8 +334,7 @@ class DataTransformer:
             raise ValueError(f"Type conversion failed: {e}")
     
    
-    def process_percentage_fields(self, src_df: pd.DataFrame, tgt_df: pd.DataFrame, 
-                                row: Dict[str, Any]) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    def process_percentage_fields(self, src_df: pd.DataFrame, tgt_df: pd.DataFrame, row: Dict[str, Any]) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
         Handle percentage fields in both dataframes for consistent comparison.
         
@@ -354,26 +353,33 @@ class DataTransformer:
             if not percentage_columns:
                 return src_df, tgt_df
                 
-            # Extract source and target dataframes for processing
-            source_df = src_df[percentage_columns].copy()
-            target_df = tgt_df[percentage_columns].copy()
-            
-            # Process source dataframe percentage columns
-            source_df = source_df.apply(
-                lambda x: self._convert_percentage_field(x, row['SRC_Connection'] == 'Excel')
-            )
-            
-            # Process target dataframe percentage columns
-            target_df = target_df.apply(
-                lambda x: self._convert_percentage_field(x, row['TGT_Connection'] == 'Excel')
-            )
-            
-            # Update the original dataframes with processed columns
-            src_df[percentage_columns] = source_df
-            tgt_df[percentage_columns] = target_df
-            
-            return src_df, tgt_df
-            
+            # Make copies to avoid modifying the original dataframes
+            source_df = src_df.copy()
+            target_df = tgt_df.copy()
+                
+            # Process only columns that exist and are numeric or string (skip dates and other types)
+            for column in percentage_columns:
+                # Check if column exists in both dataframes
+                if column not in source_df.columns or column not in target_df.columns:
+                    continue
+                    
+                # Check column types and skip problematic ones
+                src_dtype = source_df[column].dtype
+                tgt_dtype = target_df[column].dtype
+                
+                # Skip datetime columns
+                if pd.api.types.is_datetime64_dtype(src_dtype) or pd.api.types.is_datetime64_dtype(tgt_dtype):
+                    continue
+                    
+                # Only process numeric or object (string) columns
+                if pd.api.types.is_numeric_dtype(src_dtype) or pd.api.types.is_object_dtype(src_dtype):
+                    source_df[column] = self._convert_percentage_field(source_df[column], row['SRC_Connection'] == 'Excel')
+                    
+                if pd.api.types.is_numeric_dtype(tgt_dtype) or pd.api.types.is_object_dtype(tgt_dtype):
+                    target_df[column] = self._convert_percentage_field(target_df[column], row['TGT_Connection'] == 'Excel')
+                
+            return source_df, target_df
+                
         except Exception as e:
             self.log.error(f"Failed: Handling Percentage Fields - {e}")
             raise ValueError(f"Percentage field processing failed: {e}")
@@ -531,41 +537,56 @@ class DataValidationFramework:
                 "test_id": self.src_tgt_data_info.iloc[row_index].get("Test_ID", "Unknown") if row_index < len(self.src_tgt_data_info) else "Unknown"
             }
             
-    def _apply_transformations(self, src_df: pd.DataFrame, tgt_df: pd.DataFrame, row: Dict[str, Any]) -> None:
-        """Apply necessary transformations to make dataframes comparable
-
-            Args:
-        src_df (pd.DataFrame): Source DataFrame
-        tgt_df (pd.DataFrame): Target DataFrame
-        row_index: Index of the pair to validate in configuration
-        
-        Returns:
-            Tuple[pd.DataFrame, pd.DataFrame]: Transformed source and target DataFrames
-        """
+    def _apply_transformations(self, src_df, tgt_df, test_config):
+        """Apply necessary transformations to make dataframes comparable"""
         try:
-            # Standardize column names
-            #src_df = self.transformer.standardize_column_names(src_df)
-            #tgt_df = self.transformer.standardize_column_names(tgt_df)
+            # Check if percentage fields are specified and skip if empty
+            percentage_fields = json.loads(test_config.get('Percentage_Fields', '[]')) if test_config.get('Percentage_Fields') else []
             
-            # Convert date fields if specified
-            if row.get('Date_Fields'):
-                date_fields = json.loads(row['Date_Fields']) if row['Date_Fields'] else []
+            # Only process percentage fields if there are any specified AND they're not empty
+            if percentage_fields and any(percentage_fields):
+                # Filter out empty strings or null values in percentage_fields
+                percentage_fields = [field for field in percentage_fields if field and field.strip()]
+                
+                # Only proceed if there are still fields after filtering
+                if percentage_fields:
+                    # Check if all specified percentage fields exist in both dataframes
+                    src_cols = set(src_df.columns)
+                    tgt_cols = set(tgt_df.columns)
+                    
+                    # Filter to only include fields that exist in both dataframes
+                    valid_percentage_fields = [
+                        field for field in percentage_fields 
+                        if field in src_cols and field in tgt_cols
+                    ]
+                    
+                    # Only process if there are valid fields
+                    if valid_percentage_fields:
+                        src_df, tgt_df = self.transformer.process_percentage_fields(
+                            src_df, tgt_df, {'Percentage_Fields': json.dumps(valid_percentage_fields)}
+                        )
+            
+            # Similar checks for date fields
+            date_fields = json.loads(test_config.get('Date_Fields', '[]')) if test_config.get('Date_Fields') else []
+            if date_fields and any(date_fields):
+                date_fields = [field for field in date_fields if field and field.strip()]
                 if date_fields:
-                    src_df, tgt_df = self.transformer.convert_date_fields(src_df, tgt_df, date_fields)
+                    src_cols = set(src_df.columns)
+                    tgt_cols = set(tgt_df.columns)
+                    valid_date_fields = [
+                        field for field in date_fields 
+                        if field in src_cols and field in tgt_cols
+                    ]
+                    if valid_date_fields:
+                        src_df, tgt_df = self.transformer.convert_date_fields(
+                            src_df, tgt_df, valid_date_fields
+                        )
             
-            # Convert type fields if specified
-            if row.get('Type_Convert_Fields'):
-                type_fields = json.loads(row['Type_Convert_Fields']) if row['Type_Convert_Fields'] else []
-                if type_fields:
-                    src_df, tgt_df = self.transformer.convert_type_fields(src_df, tgt_df, type_fields)
-            
-            # Process percentage fields if specified
-            if row.get('Percentage_Fields'):
-                src_df, tgt_df = self.transformer.process_percentage_fields(src_df, tgt_df, row)
+            # Add similar checks for any other transformations
             
             return src_df, tgt_df
         except Exception as e:
             self.log.error(f"Error in applying transformations to DataFrames: {e}")
-        raise    
+            raise
 
 

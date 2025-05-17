@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, url_for, flash, request, session, jsonify
+from flask import Flask, render_template, redirect, url_for, flash, request, session, jsonify,send_file
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -16,12 +16,14 @@ from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy import func
 from integration.dataqe_bridge import DataQEBridge
 
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'dev-key-for-testing'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///dataqe.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['SQL_FOLDER'] = os.path.join('static', 'sql_files')
+app.config['DEBUG'] = True
 
 # Email configuration
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'  # Change to your SMTP server
@@ -215,6 +217,63 @@ def is_binary_file(file_path):
         return False  # If no error, it's a text file
     except UnicodeDecodeError:
         return True  # If decode error, it's likely a binary file
+
+def safe_excel_preview(file_path, max_rows=5):
+    """Generate a safe preview of Excel files with robust error handling"""
+    # Get just the filename without path
+    filename = os.path.basename(file_path)
+    file_size = os.path.getsize(file_path)
+    
+    # First try with direct binary reading to create a small preview table manually
+    try:
+        with open(file_path, 'rb') as f:
+            # Check for Excel file signatures
+            header = f.read(8)
+            
+            # Try our own simplified Excel reader
+            import io
+            import tempfile
+            import subprocess
+            
+            # Try to convert to CSV using external tools if available
+            try:
+                with tempfile.NamedTemporaryFile(suffix='.csv', delete=False) as temp_file:
+                    temp_csv_path = temp_file.name
+                
+                # Try using ssconvert (part of Gnumeric)
+                try:
+                    result = subprocess.run(['ssconvert', file_path, temp_csv_path], 
+                                           capture_output=True, text=True, timeout=5)
+                    if result.returncode == 0:
+                        import pandas as pd
+                        df = pd.read_csv(temp_csv_path, nrows=max_rows)
+                        os.unlink(temp_csv_path)  # Delete temp file
+                        return f"Excel file: {filename}\n\nPreview (first {max_rows} rows):\n{df.to_string()}"
+                except (subprocess.SubprocessError, FileNotFoundError):
+                    # ssconvert not available or failed
+                    pass
+                
+                # If we reach here, try pandas with explicit engines
+                try:
+                    import pandas as pd
+                    
+                    # Try with automatic engine
+                    df = pd.read_excel(file_path, nrows=max_rows, engine=None)
+                    return f"Excel file: {filename}\n\nPreview (first {max_rows} rows):\n{df.to_string()}"
+                except Exception as e1:
+                    # Create a preview table with basic info
+                    return f"""Excel file: {filename}
+                            Size: {file_size} bytes
+                            Format: {"XLSX (Office 2007+)" if filename.endswith('.xlsx') else "XLS (Office 97-2003)"}
+
+                            This Excel file cannot be previewed directly. You can download and open it in Excel.
+                            Error details: {str(e1)}"""
+            except Exception as e:
+                # Fall back to basic info
+                return f"Excel file: {filename}\nSize: {file_size} bytes\nCould not generate preview. Try downloading the file."
+    except Exception as e:
+        # Last resort
+        return f"Excel file: {filename}\nSize: {file_size} bytes\nCould not generate preview: {str(e)}"     
 
 
 @login_manager.user_loader
@@ -640,6 +699,7 @@ def new_testcase():
 def testcase_detail(testcase_id):
     test_case = TestCase.query.get_or_404(testcase_id)
     
+    # Check permissions
     if not current_user.is_admin and current_user.team_id != test_case.team_id:
         flash('Access denied', 'error')
         return redirect(url_for('dashboard'))
@@ -655,60 +715,54 @@ def testcase_detail(testcase_id):
         project_input_folder = app.config.get('SQL_FOLDER', os.path.join('static', 'sql_files'))
     
     # Read file content if available
-    src_content = None
-    tgt_content = None
+    src_sql = None
+    tgt_sql = None
     
     if test_case.src_data_file:
         try:
             file_path = os.path.join(project_input_folder, test_case.src_data_file)
             
             # Check if this is Excel or binary file
-            if is_binary_file(file_path) or test_case.src_data_file.endswith(('.xlsx', '.xls', '.xlsm')):
-                # For Excel files, just show file info
-                src_content = f"Excel file: {test_case.src_data_file}"
-                
-                # Optionally show preview if pandas is available
-                try:
-                    import pandas as pd
-                    df = pd.read_excel(file_path, nrows=5)  # Read first 5 rows
-                    src_content += "\n\nPreview (first 5 rows):\n" + df.to_string()
-                except Exception as e:
-                    src_content += f"\n\nCould not generate preview: {str(e)}"
+            if test_case.src_data_file.endswith(('.xlsx', '.xls', '.xlsm')):
+                # For Excel files, use our safe preview function
+                src_sql = safe_excel_preview(file_path)
             else:
                 # For text files, show content
-                src_content = read_file_with_multiple_encodings(file_path)
+                with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+                    src_sql = f.read()
         except Exception as e:
-            src_content = f"Could not read source file: {str(e)}"
+            src_sql = f"Could not read source file: {str(e)}"
     
     if test_case.tgt_data_file:
         try:
             file_path = os.path.join(project_input_folder, test_case.tgt_data_file)
             
             # Check if this is Excel or binary file
-            if is_binary_file(file_path) or test_case.tgt_data_file.endswith(('.xlsx', '.xls', '.xlsm')):
-                # For Excel files, just show file info
-                tgt_content = f"Excel file: {test_case.tgt_data_file}"
-                
-                # Optionally show preview if pandas is available
-                try:
-                    import pandas as pd
-                    df = pd.read_excel(file_path, nrows=5)  # Read first 5 rows
-                    tgt_content += "\n\nPreview (first 5 rows):\n" + df.to_string()
-                except Exception as e:
-                    tgt_content += f"\n\nCould not generate preview: {str(e)}"
+            if test_case.tgt_data_file.endswith(('.xlsx', '.xls', '.xlsm')):
+                # For Excel files, use our safe preview function
+                tgt_sql = safe_excel_preview(file_path)
             else:
                 # For text files, show content
-                tgt_content = read_file_with_multiple_encodings(file_path)
+                with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+                    tgt_sql = f.read()
         except Exception as e:
-            tgt_content = f"Could not read target file: {str(e)}"
+            tgt_sql = f"Could not read target file: {str(e)}"
     
-    # Pass variables to template (update variable names to be consistent)
+    # Sort executions by time (latest first)
+    sorted_executions = sorted(
+        test_case.executions, 
+        key=lambda x: x.execution_time if x.execution_time else datetime.min, 
+        reverse=True
+    )
+    
+    # Pass variables to template
     return render_template('testcase_detail.html', 
                           test_case=test_case,
                           team=team,
                           project=project,
-                          src_sql=src_content,  # Renamed from src_sql to be more general
-                          tgt_sql=tgt_content)  # Renamed from tgt_sql to be more general
+                          src_sql=src_sql,
+                          tgt_sql=tgt_sql,
+                          sorted_executions=sorted_executions[:5])
 
 @app.route('/testcase/edit/<int:testcase_id>', methods=['GET', 'POST'])
 @login_required
@@ -840,6 +894,58 @@ def edit_testcase(testcase_id):
                           src_sql=src_sql,
                           tgt_sql=tgt_sql)
 
+@app.route('/download/testcase/<int:testcase_id>/<source_or_target>')
+@login_required
+def download_testcase_file(testcase_id, source_or_target):
+    """Download source or target file for a test case"""
+    test_case = TestCase.query.get_or_404(testcase_id)
+    
+    # Check permissions
+    if not current_user.is_admin and current_user.team_id != test_case.team_id:
+        flash('Access denied')
+        return redirect(url_for('dashboard'))
+    
+    # Get the file path
+    project = test_case.team.project
+    project_input_folder = os.path.join(project.folder_path, 'input')
+    
+    if source_or_target == 'source':
+        file_name = test_case.src_data_file
+    elif source_or_target == 'target':
+        file_name = test_case.tgt_data_file
+    else:
+        flash('Invalid file type requested', 'error')
+        return redirect(url_for('testcase_detail', testcase_id=test_case.id))
+    
+    if not file_name:
+        flash(f'No {source_or_target} file available', 'error')
+        return redirect(url_for('testcase_detail', testcase_id=test_case.id))
+    
+    file_path = os.path.join(project_input_folder, file_name)
+    
+    if not os.path.exists(file_path):
+        flash(f'{source_or_target.capitalize()} file not found', 'error')
+        return redirect(url_for('testcase_detail', testcase_id=test_case.id))
+    
+    # Determine content type
+    mimetype = None
+    if file_name.endswith('.xlsx'):
+        mimetype = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    elif file_name.endswith('.xls'):
+        mimetype = 'application/vnd.ms-excel'
+    elif file_name.endswith('.csv'):
+        mimetype = 'text/csv'
+    elif file_name.endswith('.sql'):
+        mimetype = 'application/sql'
+    else:
+        mimetype = 'application/octet-stream'
+    
+    return send_file(
+        file_path,
+        as_attachment=True,
+        download_name=file_name,
+        mimetype=mimetype
+    )
 
 # API for datacompare framework
 @app.route('/api/testcases/<int:team_id>')
@@ -1099,6 +1205,26 @@ def remove_team_member(team_id, user_id):
     
     return redirect(url_for('team_detail', team_id=team_id))
 
+@app.route('/testcase/<int:testcase_id>/execute', methods=['GET', 'POST'])
+@login_required
+def execute_testcase_ui(testcase_id):
+    """UI for executing a test case"""
+    test_case = TestCase.query.get_or_404(testcase_id)
+    
+    # Check permissions
+    if not current_user.is_admin and current_user.team_id != test_case.team_id:
+        flash('Access denied', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # For GET requests, display the execution page
+    if request.method == 'GET':
+        return render_template('execute_testcase.html', test_case=test_case)
+    
+    # For POST requests (form submission), redirect to the API endpoint
+    # This will avoid page reload issues
+    return redirect(url_for('execute_test', test_case_id=testcase_id))
+
+
 @app.route('/api/execute/<int:test_case_id>', methods=['POST'])
 @login_required
 def execute_test(test_case_id):
@@ -1107,7 +1233,23 @@ def execute_test(test_case_id):
     
     # Check permissions
     if not current_user.is_admin and current_user.team_id != test_case.team_id:
-        return jsonify({'error': 'Access denied'}), 403
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'error': 'Access denied'}), 403
+        else:
+            flash('Access denied', 'error')
+            return redirect(url_for('dashboard'))
+    
+    # Get optional overrides from form
+    src_sheet_override = request.form.get('src_sheet_override')
+    tgt_sheet_override = request.form.get('tgt_sheet_override')
+    debug_mode = 'debug_mode' in request.form
+    
+    # Apply overrides if provided
+    if src_sheet_override and test_case.src_sheet_name != src_sheet_override:
+        test_case.src_sheet_name = src_sheet_override
+    
+    if tgt_sheet_override and test_case.tgt_sheet_name != tgt_sheet_override:
+        test_case.tgt_sheet_name = tgt_sheet_override
     
     # Create execution record
     execution = TestExecution(
@@ -1118,45 +1260,52 @@ def execute_test(test_case_id):
     db.session.add(execution)
     db.session.commit()
     
-    # Start execution (you would integrate with your data comparison framework here)
+    # Start execution
     try:
         execution.status = 'RUNNING'
         db.session.commit()
         
-        # TODO: Integrate with your actual data comparison framework
-        # This is a placeholder for the actual execution logic
-        result = execute_test_case_logic(test_case, execution)
+        # Execute test case using the bridge
+        result = dataqa_bridge.execute_test_case(test_case, execution)
         
         # Update execution with results
         execution.end_time = datetime.utcnow()
         execution.duration = (execution.end_time - execution.execution_time).total_seconds()
-        execution.status = result['status']
+        execution.status = result.get('status', 'ERROR')
         execution.records_compared = result.get('records_compared', 0)
         execution.mismatches_found = result.get('mismatches_found', 0)
         execution.log_file = result.get('log_file')
         
-        if result['status'] == 'FAILED':
+        if result.get('status') == 'FAILED':
             execution.error_message = result.get('error_message')
             
-            # Store mismatches
-            for mismatch in result.get('mismatches', []):
-                mismatch_record = TestMismatch(
-                    execution_id=execution.id,
-                    row_identifier=mismatch['row_id'],
-                    column_name=mismatch['column'],
-                    source_value=mismatch['source_value'],
-                    target_value=mismatch['target_value'],
-                    mismatch_type=mismatch['type']
-                )
-                db.session.add(mismatch_record)
-            
-            # Send notification email
-            if test_case.team:
-                recipients = [user.email for user in test_case.team.users if user.email]
-                send_test_failure_notification(execution, recipients)
+            # Store mismatches if provided
+            if result.get('mismatches'):
+                for mismatch in result.get('mismatches', []):
+                    mismatch_record = TestMismatch(
+                        execution_id=execution.id,
+                        row_identifier=mismatch.get('row_id', 'Unknown'),
+                        column_name=mismatch.get('column', 'Unknown'),
+                        source_value=str(mismatch.get('source_value', '')),
+                        target_value=str(mismatch.get('target_value', '')),
+                        mismatch_type=mismatch.get('type', 'VALUE_MISMATCH')
+                    )
+                    db.session.add(mismatch_record)
         
         db.session.commit()
-        return jsonify({'execution_id': execution.id, 'status': execution.status})
+        
+        # For AJAX requests, return JSON
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({
+                'execution_id': execution.id,
+                'status': execution.status,
+                'redirect_url': url_for('execution_detail', execution_id=execution.id)
+            })
+        
+        # For regular requests, redirect to execution detail page
+        flash(f'Test execution {execution.status.lower()}', 
+              'success' if execution.status == 'PASSED' else 'danger')
+        return redirect(url_for('execution_detail', execution_id=execution.id))
         
     except Exception as e:
         execution.status = 'ERROR'
@@ -1164,7 +1313,15 @@ def execute_test(test_case_id):
         execution.end_time = datetime.utcnow()
         execution.duration = (execution.end_time - execution.execution_time).total_seconds()
         db.session.commit()
-        return jsonify({'error': str(e)}), 500
+        
+        # For AJAX requests, return JSON
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'error': str(e)}), 500
+        
+        # For regular requests, redirect with error
+        flash(f'Error executing test case: {str(e)}', 'error')
+        return redirect(url_for('testcase_detail', testcase_id=test_case_id))
+
 
 def execute_test_case_logic(test_case, execution):
     """Execute test case using the data validation framework"""
@@ -1221,9 +1378,45 @@ def execution_detail(execution_id):
     
     mismatches = TestMismatch.query.filter_by(execution_id=execution_id).all()
     
+    # Check if there's a log file to display
+    log_content = None
+    if execution.log_file and os.path.exists(execution.log_file):
+        try:
+            with open(execution.log_file, 'r') as f:
+                log_content = f.read()
+        except:
+            log_content = "Error reading log file"
+    
+    # Check if there's a debug log
+    debug_log = None
+    if os.path.exists('debug_log.txt'):
+        try:
+            with open('debug_log.txt', 'r') as f:
+                log_lines = f.readlines()
+                # Find the section for this execution
+                relevant_lines = []
+                collecting = False
+                for line in log_lines:
+                    if f"Test Case ID: {execution.test_case.tcid}" in line and "New Execution" in line:
+                        collecting = True
+                        relevant_lines = [line]
+                    elif collecting and "--- Execution" in line:
+                        relevant_lines.append(line)
+                        collecting = False
+                    elif collecting:
+                        relevant_lines.append(line)
+                
+                if relevant_lines:
+                    debug_log = ''.join(relevant_lines)
+        except:
+            debug_log = "Error reading debug log"
+    
     return render_template('execution_detail.html', 
                          execution=execution, 
-                         mismatches=mismatches)
+                         mismatches=mismatches,
+                         log_content=log_content,
+                         debug_log=debug_log)
+
 
 @app.route('/executions')
 @login_required
@@ -1309,6 +1502,44 @@ def results_dashboard():
                          error_executions=error_executions,
                          recent_executions=recent_executions,
                          problem_tests=problem_tests)
+
+
+# Add this route to your dataqe_app.py file
+
+@app.route('/execution/<int:execution_id>/download_log')
+@login_required
+def download_log(execution_id):
+    """Download execution log file"""
+    execution = TestExecution.query.get_or_404(execution_id)
+    
+    # Check permissions
+    if not current_user.is_admin and current_user.team_id != execution.test_case.team_id:
+        flash('Access denied')
+        return redirect(url_for('dashboard'))
+    
+    if not execution.log_file or not os.path.exists(execution.log_file):
+        flash('Log file not found', 'error')
+        return redirect(url_for('execution_detail', execution_id=execution_id))
+    
+    # Determine the filename for the download
+    filename = f"{execution.test_case.tcid}_execution_{execution_id}_{execution.execution_time.strftime('%Y%m%d')}.xlsx"
+    
+    # Check if it's an Excel file
+    if execution.log_file.endswith('.xlsx'):
+        return send_file(
+            execution.log_file,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+    else:
+        # For text files
+        return send_file(
+            execution.log_file,
+            as_attachment=True,
+            download_name=filename.replace('.xlsx', '.txt'),
+            mimetype='text/plain'
+        )
 
 ## 5. Basic Scheduling Functionality
 
@@ -1399,6 +1630,21 @@ def create_schedule(test_case_id):
         return redirect(url_for('testcase_detail', testcase_id=test_case_id))
     
     return render_template('create_schedule.html', test_case=test_case)
+
+@app.route('/debug/last-execution')
+@login_required
+def debug_last_execution():
+    execution = TestExecution.query.order_by(TestExecution.execution_time.desc()).first()
+    if execution:
+        return jsonify({
+            'id': execution.id,
+            'test_case_id': execution.test_case_id,
+            'status': execution.status,
+            'error_message': execution.error_message,
+            'execution_time': execution.execution_time.isoformat() if execution.execution_time else None,
+            'end_time': execution.end_time.isoformat() if execution.end_time else None
+        })
+    return jsonify({'error': 'No executions found'})
 
 # Add to your CLI commands
 @app.cli.command('init-db')

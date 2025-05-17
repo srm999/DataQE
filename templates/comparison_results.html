@@ -1,0 +1,350 @@
+{% extends "base.html" %}
+
+{% block title %}Data Comparison Results{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        Execution Details - {{ execution.test_case.tcid }} ({{ execution.test_case.tc_name }})
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <table class="table table-sm">
+                                <tbody>
+                                    <tr>
+                                        <th>Test Case ID:</th>
+                                        <td>{{ execution.test_case.tcid }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Table Name:</th>
+                                        <td>{{ execution.test_case.table_name }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Test Type:</th>
+                                        <td>{{ execution.test_case.test_type }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Execution Time:</th>
+                                        <td>{{ execution.execution_time.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <table class="table table-sm">
+                                <tbody>
+                                    <tr>
+                                        <th>Status:</th>
+                                        <td>
+                                            {% if execution.status == 'PASSED' %}
+                                                <span class="badge bg-success">PASSED</span>
+                                            {% elif execution.status == 'FAILED' %}
+                                                <span class="badge bg-danger">FAILED</span>
+                                            {% elif execution.status == 'ERROR' %}
+                                                <span class="badge bg-warning">ERROR</span>
+                                            {% else %}
+                                                <span class="badge bg-info">{{ execution.status }}</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>Duration:</th>
+                                        <td>{{ "%.2f"|format(execution.duration) }} seconds</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Records Compared:</th>
+                                        <td>{{ execution.records_compared }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Mismatches Found:</th>
+                                        <td>
+                                            {% if execution.mismatches_found > 0 %}
+                                                <span class="text-danger">{{ execution.mismatches_found }}</span>
+                                            {% else %}
+                                                <span class="text-success">{{ execution.mismatches_found }}</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {% if execution.error_message %}
+                    <div class="alert alert-danger">
+                        <h6>Error Message:</h6>
+                        <pre>{{ execution.error_message }}</pre>
+                    </div>
+                    {% endif %}
+
+                    {% if execution.log_file %}
+                    <div class="mb-3">
+                        <a href="{{ url_for('download_log_file', execution_id=execution.id) }}" class="btn btn-primary">
+                            <i class="fas fa-download"></i> Download Full Report
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Information -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Summary</h5>
+                </div>
+                <div class="card-body">
+                    <div id="summary-section">
+                        <div class="text-center">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p>Loading summary data...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mismatch Details -->
+    {% if execution.status == 'FAILED' and execution.mismatches_found > 0 %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Mismatch Details</h5>
+                </div>
+                <div class="card-body">
+                    <div id="mismatch-section">
+                        <div class="text-center">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p>Loading mismatch data...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- JavaScript to load results dynamically -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Load execution results
+    const executionId = {{ execution.id }};
+    
+    // Fetch results data
+    fetch(`/api/execution/${executionId}/results`)
+        .then(response => response.json())
+        .then(data => {
+            // Update summary section
+            updateSummarySection(data.summary);
+            
+            // Update mismatch section if there are mismatches
+            if (data.details && data.details.hasOwnProperty('Mismatch Analysis')) {
+                updateMismatchSection(data.details['Mismatch Analysis']);
+            } else if (data.details && data.details.hasOwnProperty('Duplicates')) {
+                updateDuplicatesSection(data.details['Duplicates']);
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching execution results:', error);
+            document.getElementById('summary-section').innerHTML = `
+                <div class="alert alert-danger">
+                    <p>Error loading results: ${error.message}</p>
+                </div>
+            `;
+            
+            if (document.getElementById('mismatch-section')) {
+                document.getElementById('mismatch-section').innerHTML = `
+                    <div class="alert alert-danger">
+                        <p>Error loading mismatch data: ${error.message}</p>
+                    </div>
+                `;
+            }
+        });
+});
+
+function updateSummarySection(summary) {
+    // Create summary table based on test type
+    let summaryHtml = '';
+    
+    if (summary) {
+        summaryHtml = `
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Metric</th>
+                            <th>Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Status</td>
+                            <td>
+                                ${summary.status === 'PASSED' ? 
+                                    '<span class="badge bg-success">PASSED</span>' : 
+                                    (summary.status === 'FAILED' ? 
+                                        '<span class="badge bg-danger">FAILED</span>' :
+                                        '<span class="badge bg-warning">ERROR</span>')}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Records Compared</td>
+                            <td>${summary.records_compared}</td>
+                        </tr>
+                        <tr>
+                            <td>Mismatches Found</td>
+                            <td>${summary.mismatches_found}</td>
+                        </tr>
+                        <tr>
+                            <td>Duration</td>
+                            <td>${summary.duration ? summary.duration.toFixed(2) : 'N/A'} seconds</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        `;
+    } else {
+        summaryHtml = `
+            <div class="alert alert-warning">
+                <p>No summary data available.</p>
+            </div>
+        `;
+    }
+    
+    document.getElementById('summary-section').innerHTML = summaryHtml;
+}
+
+function updateMismatchSection(mismatches) {
+    // Get mismatch section element
+    const mismatchSection = document.getElementById('mismatch-section');
+    if (!mismatchSection) return;
+    
+    // Create mismatch table
+    if (mismatches && mismatches.length > 0) {
+        // Get columns from first mismatch
+        const columns = Object.keys(mismatches[0]);
+        
+        let mismatchHtml = `
+            <div class="table-responsive">
+                <p>Showing ${Math.min(100, mismatches.length)} of ${mismatches.length} mismatches:</p>
+                <table class="table table-striped table-sm">
+                    <thead>
+                        <tr>
+                            ${columns.map(col => `<th>${col}</th>`).join('')}
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        // Add rows (limit to first 100 to avoid browser slowdown)
+        const limitedMismatches = mismatches.slice(0, 100);
+        limitedMismatches.forEach(mismatch => {
+            mismatchHtml += '<tr>';
+            columns.forEach(col => {
+                let cellValue = mismatch[col] !== null ? mismatch[col] : '';
+                
+                // Highlight based on mismatch type
+                if (col === '__mismatch_type') {
+                    if (cellValue === 'Value-Mismatch') {
+                        cellValue = `<span class="badge bg-warning">Value Mismatch</span>`;
+                    } else if (cellValue === 'Source-only-row') {
+                        cellValue = `<span class="badge bg-danger">Source Only</span>`;
+                    } else if (cellValue === 'Target-only-row') {
+                        cellValue = `<span class="badge bg-info">Target Only</span>`;
+                    }
+                }
+                
+                // Add cell
+                mismatchHtml += `<td>${cellValue}</td>`;
+            });
+            mismatchHtml += '</tr>';
+        });
+        
+        mismatchHtml += `
+                    </tbody>
+                </table>
+            </div>
+        `;
+        
+        mismatchSection.innerHTML = mismatchHtml;
+    } else {
+        mismatchSection.innerHTML = `
+            <div class="alert alert-info">
+                <p>No mismatch details available.</p>
+            </div>
+        `;
+    }
+}
+
+function updateDuplicatesSection(duplicates) {
+    // Get mismatch section element and repurpose for duplicates
+    const mismatchSection = document.getElementById('mismatch-section');
+    if (!mismatchSection) return;
+    
+    // Update heading
+    const cardHeader = mismatchSection.closest('.card').querySelector('.card-header');
+    if (cardHeader) {
+        cardHeader.innerHTML = '<h5 class="card-title mb-0">Duplicate Records</h5>';
+    }
+    
+    // Create duplicates table
+    if (duplicates && duplicates.length > 0) {
+        // Get columns from first duplicate
+        const columns = Object.keys(duplicates[0]);
+        
+        let duplicatesHtml = `
+            <div class="table-responsive">
+                <p>Showing ${Math.min(100, duplicates.length)} of ${duplicates.length} duplicate records:</p>
+                <table class="table table-striped table-sm">
+                    <thead>
+                        <tr>
+                            ${columns.map(col => `<th>${col}</th>`).join('')}
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        // Add rows (limit to first 100 to avoid browser slowdown)
+        const limitedDuplicates = duplicates.slice(0, 100);
+        limitedDuplicates.forEach(duplicate => {
+            duplicatesHtml += '<tr>';
+            columns.forEach(col => {
+                let cellValue = duplicate[col] !== null ? duplicate[col] : '';
+                duplicatesHtml += `<td>${cellValue}</td>`;
+            });
+            duplicatesHtml += '</tr>';
+        });
+        
+        duplicatesHtml += `
+                    </tbody>
+                </table>
+            </div>
+        `;
+        
+        mismatchSection.innerHTML = duplicatesHtml;
+    } else {
+        mismatchSection.innerHTML = `
+            <div class="alert alert-info">
+                <p>No duplicate records available.</p>
+            </div>
+        `;
+    }
+}
+</script>
+{% endblock %}

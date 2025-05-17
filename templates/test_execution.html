@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+
+{% block title %}Test Case Execution - DataQE Suite{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('testcase_detail', testcase_id=test_case.id) }}">{{ test_case.tcid }}</a></li>
+                    <li class="breadcrumb-item active">Execute Test</li>
+                </ol>
+            </nav>
+            
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Test Case: {{ test_case.tcid }} - {{ test_case.tc_name }}</h5>
+                    <span class="badge bg-{{ 'success' if test_case.test_yn == 'Y' else 'secondary' }}">{{ 'Active' if test_case.test_yn == 'Y' else 'Inactive' }}</span>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Table:</strong> {{ test_case.table_name }}</p>
+                            <p><strong>Test Type:</strong> {{ test_case.test_type }}</p>
+                            <p><strong>Created By:</strong> {{ test_case.creator.username if test_case.creator else 'Unknown' }}</p>
+                            <p><strong>Created On:</strong> {{ test_case.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Primary Key Columns:</strong> {{ test_case.pk_columns | replace('"', '') | replace('[', '') | replace(']', '') }}</p>
+                            <p><strong>Source Connection:</strong> {{ test_case.src_connection.name if test_case.src_connection else 'None' }}</p>
+                            <p><strong>Target Connection:</strong> {{ test_case.tgt_connection.name if test_case.tgt_connection else 'None' }}</p>
+                            <p><strong>Threshold %:</strong> {{ test_case.threshold_percentage }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Execution Options</h5>
+                </div>
+                <div class="card-body">
+                    <form id="execution-form" method="post" action="{{ url_for('execute_test', test_case_id=test_case.id) }}">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Source Data</label>
+                                    <p class="form-text">{{ test_case.src_data_file if test_case.src_data_file else 'No source file' }}</p>
+                                    
+                                    {% if test_case.src_connection and test_case.src_connection.is_excel %}
+                                    <div class="mb-3">
+                                        <label for="src_sheet_override" class="form-label">Source Sheet Name (Optional Override)</label>
+                                        <input type="text" class="form-control" id="src_sheet_override" name="src_sheet_override" value="{{ test_case.src_sheet_name }}">
+                                        <div class="form-text">Leave empty to use default sheet or value from test case.</div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Target Data</label>
+                                    <p class="form-text">{{ test_case.tgt_data_file if test_case.tgt_data_file else 'No target file' }}</p>
+                                    
+                                    {% if test_case.tgt_connection and test_case.tgt_connection.is_excel %}
+                                    <div class="mb-3">
+                                        <label for="tgt_sheet_override" class="form-label">Target Sheet Name (Optional Override)</label>
+                                        <input type="text" class="form-control" id="tgt_sheet_override" name="tgt_sheet_override" value="{{ test_case.tgt_sheet_name }}">
+                                        <div class="form-text">Leave empty to use default sheet or value from test case.</div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="debug_mode" name="debug_mode">
+                            <label class="form-check-label" for="debug_mode">Enable Debug Mode</label>
+                            <div class="form-text">This will provide more detailed logging during execution.</div>
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary" id="execute-btn">
+                                <i class="bi bi-play-circle"></i> Execute Test
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Previous Executions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Execution Time</th>
+                                    <th>Status</th>
+                                    <th>Records Compared</th>
+                                    <th>Mismatches</th>
+                                    <th>Duration</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for execution in test_case.executions|sort(attribute='execution_time', reverse=True) %}
+                                <tr>
+                                    <td>{{ execution.id }}</td>
+                                    <td>{{ execution.execution_time.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                    <td>
+                                        <span class="badge bg-{{ 'success' if execution.status == 'PASSED' else 'danger' if execution.status == 'FAILED' else 'warning' if execution.status == 'ERROR' else 'secondary' }}">
+                                            {{ execution.status }}
+                                        </span>
+                                    </td>
+                                    <td>{{ execution.records_compared or 0 }}</td>
+                                    <td>{{ execution.mismatches_found or 0 }}</td>
+                                    <td>{{ "%.2f"|format(execution.duration or 0) }}s</td>
+                                    <td>
+                                        <a href="{{ url_for('execution_detail', execution_id=execution.id) }}" class="btn btn-sm btn-outline-secondary">
+                                            <i class="bi bi-search"></i> View
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="7" class="text-center">No previous executions found.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Modal -->
+<div class="modal fade" id="loadingModal" tabindex="-1" aria-labelledby="loadingModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="loadingModalLabel">Executing Test Case</h5>
+            </div>
+            <div class="modal-body text-center">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mb-0">Please wait while the test case is being executed. This may take a few moments...</p>
+                <div class="progress mt-3" style="height: 20px;">
+                    <div id="execution-progress" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                </div>
+                <p class="mt-2 mb-0" id="execution-status">Initializing...</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const executionForm = document.getElementById('execution-form');
+        const executeBtn = document.getElementById('execute-btn');
+        const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
+        const progressBar = document.getElementById('execution-progress');
+        const statusText = document.getElementById('execution-status');
+        
+        executionForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Show loading modal
+            loadingModal.show();
+            
+            // Simulate progress (since we can't get real-time updates easily)
+            let progress = 0;
+            const progressInterval = setInterval(function() {
+                progress += 5;
+                if (progress <= 90) {
+                    progressBar.style.width = progress + '%';
+                    
+                    // Update status text
+                    if (progress < 20) {
+                        statusText.textContent = "Reading source data...";
+                    } else if (progress < 40) {
+                        statusText.textContent = "Reading target data...";
+                    } else if (progress < 60) {
+                        statusText.textContent = "Comparing data...";
+                    } else if (progress < 80) {
+                        statusText.textContent = "Analyzing differences...";
+                    } else {
+                        statusText.textContent = "Generating report...";
+                    }
+                }
+            }, 500);
+            
+            // Submit the form via AJAX
+            fetch(executionForm.action, {
+                method: 'POST',
+                body: new FormData(executionForm),
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                clearInterval(progressInterval);
+                progressBar.style.width = '100%';
+                statusText.textContent = "Execution complete!";
+                
+                // Redirect to execution detail page after a short delay
+                setTimeout(function() {
+                    window.location.href = '/execution/' + data.execution_id;
+                }, 1000);
+            })
+            .catch(error => {
+                clearInterval(progressInterval);
+                progressBar.className = 'progress-bar bg-danger';
+                progressBar.style.width = '100%';
+                statusText.textContent = "Error: " + error.message;
+                
+                // Allow closing the modal after error
+                document.querySelector('#loadingModal .modal-content').innerHTML += 
+                    '<div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div>';
+                
+                console.error('Error:', error);
+            });
+        });
+    });
+</script>
+{% endblock %}

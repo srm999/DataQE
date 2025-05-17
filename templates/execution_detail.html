@@ -3,81 +3,41 @@
 {% block title %}Execution Details - DataQE Suite{% endblock %}
 
 {% block content %}
-<div class="container-fluid mt-4">
+<div class="container mt-4">
     <div class="row">
         <div class="col-12">
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb">
                     <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
-                    <li class="breadcrumb-item"><a href="{{ url_for('results_dashboard') }}">Results Dashboard</a></li>
-                    <li class="breadcrumb-item active">Execution Details</li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('testcase_detail', testcase_id=execution.test_case.id) }}">{{ execution.test_case.tcid }}</a></li>
+                    <li class="breadcrumb-item active">Execution #{{ execution.id }}</li>
                 </ol>
             </nav>
             
-            <div class="d-flex justify-content-between align-items-start mb-4">
-                <div>
-                    <h2>Execution Details</h2>
-                    <p class="text-muted">Test Case: {{ execution.test_case.tcid }} - {{ execution.test_case.tc_name }}</p>
-                </div>
-                <div>
-                    <a href="{{ url_for('testcase_detail', testcase_id=execution.test_case.id) }}" class="btn btn-outline-primary">
-                        View Test Case
-                    </a>
-                </div>
+            <div class="alert alert-{{ 'success' if execution.status == 'PASSED' else 'danger' if execution.status == 'FAILED' else 'warning' if execution.status == 'ERROR' else 'secondary' }}">
+                <h4 class="alert-heading">Test {{ execution.status }}</h4>
+                <p>
+                    Execution time: {{ execution.execution_time.strftime('%Y-%m-%d %H:%M:%S') }} | 
+                    Duration: {{ "%.2f"|format(execution.duration or 0) }} seconds
+                </p>
+                {% if execution.error_message %}
+                <hr>
+                <p class="mb-0">{{ execution.error_message }}</p>
+                {% endif %}
             </div>
             
-            <!-- Execution Summary -->
             <div class="row mb-4">
                 <div class="col-md-6">
                     <div class="card">
                         <div class="card-header">
-                            <h5 class="mb-0">Execution Summary</h5>
+                            <h5 class="mb-0">Test Case Information</h5>
                         </div>
                         <div class="card-body">
-                            <div class="row mb-3">
-                                <div class="col-sm-4"><strong>Status:</strong></div>
-                                <div class="col-sm-8">
-                                    {% if execution.status == 'PASSED' %}
-                                        <span class="badge bg-success">PASSED</span>
-                                    {% elif execution.status == 'FAILED' %}
-                                        <span class="badge bg-danger">FAILED</span>
-                                    {% elif execution.status == 'ERROR' %}
-                                        <span class="badge bg-warning">ERROR</span>
-                                    {% elif execution.status == 'RUNNING' %}
-                                        <span class="badge bg-info">RUNNING</span>
-                                    {% else %}
-                                        <span class="badge bg-secondary">{{ execution.status }}</span>
-                                    {% endif %}
-                                </div>
-                            </div>
-                            <div class="row mb-3">
-                                <div class="col-sm-4"><strong>Execution Time:</strong></div>
-                                <div class="col-sm-8">{{ execution.execution_time.strftime('%Y-%m-%d %H:%M:%S') }}</div>
-                            </div>
-                            <div class="row mb-3">
-                                <div class="col-sm-4"><strong>End Time:</strong></div>
-                                <div class="col-sm-8">
-                                    {% if execution.end_time %}
-                                        {{ execution.end_time.strftime('%Y-%m-%d %H:%M:%S') }}
-                                    {% else %}
-                                        -
-                                    {% endif %}
-                                </div>
-                            </div>
-                            <div class="row mb-3">
-                                <div class="col-sm-4"><strong>Duration:</strong></div>
-                                <div class="col-sm-8">
-                                    {% if execution.duration %}
-                                        {{ "%.2f"|format(execution.duration) }} seconds
-                                    {% else %}
-                                        -
-                                    {% endif %}
-                                </div>
-                            </div>
-                            <div class="row mb-3">
-                                <div class="col-sm-4"><strong>Executed By:</strong></div>
-                                <div class="col-sm-8">{{ execution.executor.username if execution.executor else 'System' }}</div>
-                            </div>
+                            <p><strong>ID:</strong> {{ execution.test_case.tcid }}</p>
+                            <p><strong>Name:</strong> {{ execution.test_case.tc_name }}</p>
+                            <p><strong>Table:</strong> {{ execution.test_case.table_name }}</p>
+                            <p><strong>Type:</strong> {{ execution.test_case.test_type }}</p>
+                            <p><strong>Created By:</strong> {{ execution.test_case.creator.username if execution.test_case.creator else 'Unknown' }}</p>
                         </div>
                     </div>
                 </div>
@@ -85,56 +45,50 @@
                 <div class="col-md-6">
                     <div class="card">
                         <div class="card-header">
-                            <h5 class="mb-0">Test Results</h5>
+                            <h5 class="mb-0">Execution Statistics</h5>
                         </div>
                         <div class="card-body">
-                            <div class="row mb-3">
-                                <div class="col-sm-4"><strong>Records Compared:</strong></div>
-                                <div class="col-sm-8">{{ execution.records_compared or '-' }}</div>
-                            </div>
-                            <div class="row mb-3">
-                                <div class="col-sm-4"><strong>Mismatches Found:</strong></div>
-                                <div class="col-sm-8">
-                                    {% if execution.mismatches_found %}
-                                        <span class="text-danger">{{ execution.mismatches_found }}</span>
-                                    {% else %}
-                                        0
-                                    {% endif %}
-                                </div>
-                            </div>
-                            {% if execution.error_message %}
-                            <div class="row mb-3">
-                                <div class="col-sm-4"><strong>Error Message:</strong></div>
-                                <div class="col-sm-8">
-                                    <div class="alert alert-danger mb-0">
-                                        {{ execution.error_message }}
-                                    </div>
-                                </div>
-                            </div>
-                            {% endif %}
+                            <p><strong>Records Compared:</strong> {{ execution.records_compared or 0 }}</p>
+                            <p><strong>Mismatches Found:</strong> {{ execution.mismatches_found or 0 }}</p>
+                            <p><strong>Executed By:</strong> {{ execution.executor.username if execution.executor else 'System' }}</p>
+                            <p><strong>Log File:</strong> {{ execution.log_file or 'None' }}</p>
+                            
                             {% if execution.log_file %}
-                            <div class="row mb-3">
-                                <div class="col-sm-4"><strong>Log File:</strong></div>
-                                <div class="col-sm-8">
-                                    <a href="#" class="btn btn-sm btn-outline-primary">Download Log</a>
-                                </div>
-                            </div>
+                            <a href="{{ url_for('download_log', execution_id=execution.id) }}" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-download"></i> Download Log File
+                            </a>
                             {% endif %}
                         </div>
                     </div>
                 </div>
             </div>
             
-            <!-- Mismatches Table -->
-            {% if execution.mismatches_found and execution.mismatches_found > 0 %}
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">Mismatches Details</h5>
-                </div>
-                <div class="card-body p-0">
+            <!-- Tabs for different sections -->
+            <ul class="nav nav-tabs" id="resultTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="mismatches-tab" data-bs-toggle="tab" data-bs-target="#mismatches" type="button" role="tab">
+                        Mismatches <span class="badge bg-danger">{{ mismatches|length }}</span>
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="log-tab" data-bs-toggle="tab" data-bs-target="#log" type="button" role="tab">
+                        Execution Log
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="debug-tab" data-bs-toggle="tab" data-bs-target="#debug" type="button" role="tab">
+                        Debug Log
+                    </button>
+                </li>
+            </ul>
+            
+            <div class="tab-content border border-top-0 p-3 mb-4" id="resultTabsContent">
+                <!-- Mismatches Tab -->
+                <div class="tab-pane fade show active" id="mismatches" role="tabpanel">
+                    {% if mismatches %}
                     <div class="table-responsive">
-                        <table class="table table-hover mb-0">
-                            <thead class="table-light">
+                        <table class="table table-striped table-hover">
+                            <thead>
                                 <tr>
                                     <th>Row Identifier</th>
                                     <th>Column</th>
@@ -149,36 +103,133 @@
                                     <td>{{ mismatch.row_identifier }}</td>
                                     <td>{{ mismatch.column_name }}</td>
                                     <td>
-                                        <code>{{ mismatch.source_value if mismatch.source_value else 'NULL' }}</code>
-                                    </td>
-                                    <td>
-                                        <code>{{ mismatch.target_value if mismatch.target_value else 'NULL' }}</code>
-                                    </td>
-                                    <td>
-                                        {% if mismatch.mismatch_type == 'VALUE_MISMATCH' %}
-                                            <span class="badge bg-warning">Value Mismatch</span>
-                                        {% elif mismatch.mismatch_type == 'MISSING_IN_SOURCE' %}
-                                            <span class="badge bg-danger">Missing in Source</span>
-                                        {% elif mismatch.mismatch_type == 'MISSING_IN_TARGET' %}
-                                            <span class="badge bg-danger">Missing in Target</span>
+                                        {% if mismatch.mismatch_type == 'MISSING_IN_SOURCE' %}
+                                        <span class="badge bg-warning">MISSING</span>
                                         {% else %}
-                                            <span class="badge bg-secondary">{{ mismatch.mismatch_type }}</span>
+                                        {{ mismatch.source_value }}
                                         {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if mismatch.mismatch_type == 'MISSING_IN_TARGET' %}
+                                        <span class="badge bg-warning">MISSING</span>
+                                        {% else %}
+                                        {{ mismatch.target_value }}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-{{ 'danger' if mismatch.mismatch_type == 'VALUE_MISMATCH' else 'warning' }}">
+                                            {{ mismatch.mismatch_type }}
+                                        </span>
                                     </td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
-                    {% if mismatches|length < execution.mismatches_found %}
-                    <div class="card-footer text-muted">
-                        Showing {{ mismatches|length }} of {{ execution.mismatches_found }} mismatches
+                    {% else %}
+                    <div class="alert alert-info">
+                        {% if execution.status == 'PASSED' %}
+                        <p>No mismatches found. All records match perfectly!</p>
+                        {% elif execution.status == 'ERROR' %}
+                        <p>No mismatches reported due to execution error.</p>
+                        {% else %}
+                        <p>No mismatches recorded for this execution.</p>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <!-- Log Tab -->
+                <div class="tab-pane fade" id="log" role="tabpanel">
+                    {% if log_content %}
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">Log Content</h6>
+                            <button class="btn btn-sm btn-outline-secondary" id="copyLog">
+                                <i class="bi bi-clipboard"></i> Copy
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <pre class="log-output">{{ log_content }}</pre>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        <p>No log file content available for this execution.</p>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <!-- Debug Log Tab -->
+                <div class="tab-pane fade" id="debug" role="tabpanel">
+                    {% if debug_log %}
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">Debug Information</h6>
+                            <button class="btn btn-sm btn-outline-secondary" id="copyDebug">
+                                <i class="bi bi-clipboard"></i> Copy
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <pre class="log-output">{{ debug_log }}</pre>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        <p>No debug log available for this execution.</p>
                     </div>
                     {% endif %}
                 </div>
             </div>
-            {% endif %}
+            
+            <div class="d-flex justify-content-between">
+                <a href="{{ url_for('testcase_detail', testcase_id=execution.test_case.id) }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Back to Test Case
+                </a>
+                
+                <a href="{{ url_for('execute_testcase_ui', testcase_id=execution.test_case.id) }}" class="btn btn-primary">
+                    <i class="bi bi-play-circle"></i> Execute Again
+                </a>
+            </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Copy button for logs
+        const copyLogBtn = document.getElementById('copyLog');
+        if (copyLogBtn) {
+            copyLogBtn.addEventListener('click', function() {
+                const logContent = document.querySelector('#log .log-output').textContent;
+                navigator.clipboard.writeText(logContent).then(function() {
+                    // Change button text temporarily
+                    const originalText = copyLogBtn.innerHTML;
+                    copyLogBtn.innerHTML = '<i class="bi bi-check"></i> Copied!';
+                    setTimeout(function() {
+                        copyLogBtn.innerHTML = originalText;
+                    }, 2000);
+                });
+            });
+        }
+        
+        // Copy button for debug log
+        const copyDebugBtn = document.getElementById('copyDebug');
+        if (copyDebugBtn) {
+            copyDebugBtn.addEventListener('click', function() {
+                const debugContent = document.querySelector('#debug .log-output').textContent;
+                navigator.clipboard.writeText(debugContent).then(function() {
+                    // Change button text temporarily
+                    const originalText = copyDebugBtn.innerHTML;
+                    copyDebugBtn.innerHTML = '<i class="bi bi-check"></i> Copied!';
+                    setTimeout(function() {
+                        copyDebugBtn.innerHTML = originalText;
+                    }, 2000);
+                });
+            });
+        }
+    });
+</script>
 {% endblock %}
